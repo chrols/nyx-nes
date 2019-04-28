@@ -33,7 +33,7 @@ impl File {
         let flags6 = file[6];
         let mirroring = if flags6 & 0x01 != 0 { Mirroring::Horizontal } else { Mirroring::Vertical };
         let trainer_present = flags6 & 0x04 != 0;
-        let foure_screen_vram = flags6 & 0x08 != 0;
+        //let four_screen_vram = flags6 & 0x08 != 0;
         let mapper = (flags6 & 0xF0) >> 4;
 
         
@@ -50,7 +50,7 @@ impl File {
         let trainer_offset: usize = 0x10;
         let prg_rom_offset: usize = trainer_offset + trainer_size;
         let chr_rom_offset: usize = prg_rom_offset + prg_rom_size;
-        let chr_rom_end: usize = chr_rom_offset + chr_rom_size;
+        //let chr_rom_end: usize = chr_rom_offset + chr_rom_size;
 
         let trainer = &file[trainer_offset..trainer_offset+trainer_size];                
         let prg_rom = &file[prg_rom_offset..prg_rom_offset+prg_rom_size];        
