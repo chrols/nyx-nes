@@ -274,6 +274,9 @@ impl Cpu {
 
     // Branch if Overflow Clear
     fn brk(&mut self, _step: &Step) {
+        let m1 = self.memory_read(0x02);
+        let m2 = self.memory_read(0x03);
+        println!("{:X} {:X}", m1, m2);
         panic!("Unimplemented");
     }
 
@@ -469,6 +472,13 @@ impl Cpu {
         self.i = true;
     }
 
+    // Load byte to both accumulator and X (ILLEGAL)
+    fn lax(&mut self, step: &Step) {
+        let m = self.memory_read(step.address);
+        self.x = m;
+        self.a = m;
+        self.set_zn(m);
+    }
 
 
     // Load X Register
@@ -733,7 +743,7 @@ impl Cpu {
             AddressingMode::Immediate => self.pc + 1,
             AddressingMode::Absolute => self.read_word(self.pc + 1),
             AddressingMode::AbsoluteX => self.x as u16 + self.read_word(self.pc + 1),
-            AddressingMode::AbsoluteY => self.y as u16 + self.read_word(self.pc + 1),
+            AddressingMode::AbsoluteY => (self.y as u16).wrapping_add(self.read_word(self.pc + 1)),
             AddressingMode::ZeroPage => self.memory_read(self.pc + 1) as u16,
             AddressingMode::ZeroPageX => self.memory_read(self.pc + 1 ).wrapping_add(self.x) as u16,
             AddressingMode::ZeroPageY => self.memory_read(self.pc + 1).wrapping_add(self.y) as u16,
@@ -746,8 +756,8 @@ impl Cpu {
                 }
             },
             AddressingMode::Indirect =>  self.read_word_bug(self.read_word(self.pc +1)),
-            AddressingMode::IndirectIndexed =>  self.read_word_bug(self.memory_read(self.pc + 1) as u16) + self.y as u16,
-            AddressingMode::IndexedIndirect =>  self.read_word_bug(self.memory_read(self.pc + 1) as u16) + self.x as u16,
+            AddressingMode::IndirectIndexed =>  self.read_word_bug(self.memory_read(self.pc.wrapping_add(1)) as u16).wrapping_add(self.y as u16),
+            AddressingMode::IndexedIndirect =>  self.read_word_bug(self.memory_read(self.pc.wrapping_add(1)) as u16).wrapping_add(self.x as u16),
             _ => panic!("Unimplemented addressing! {:?}", mode),
         }
     }
@@ -755,7 +765,7 @@ impl Cpu {
     fn decode(opcode: u8) -> Operation {
         match opcode {
             0 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::brk,
                 instruction: Instruction::BRK,
                 mode: AddressingMode::Implied,
                 bytes: 1,
@@ -769,17 +779,17 @@ impl Cpu {
                 cycles: 6,
             },
             2 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::kil,
                 instruction: Instruction::KIL,
                 mode: AddressingMode::Implied,
                 bytes: 0,
                 cycles: 2,
             },
             3 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             4 => Operation {
@@ -804,10 +814,10 @@ impl Cpu {
                 cycles: 5,
             },
             7 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             8 => Operation {
@@ -860,10 +870,10 @@ impl Cpu {
                 cycles: 6,
             },
             15 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             16 => Operation {
@@ -881,17 +891,17 @@ impl Cpu {
                 cycles: 5,
             },
             18 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::kil,
                 instruction: Instruction::KIL,
                 mode: AddressingMode::Implied,
                 bytes: 0,
                 cycles: 2,
             },
             19 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             20 => Operation {
@@ -916,10 +926,10 @@ impl Cpu {
                 cycles: 6,
             },
             23 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::ZeroPageX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             24 => Operation {
@@ -944,10 +954,10 @@ impl Cpu {
                 cycles: 2,
             },
             27 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             28 => Operation {
@@ -972,10 +982,10 @@ impl Cpu {
                 cycles: 7,
             },
             31 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             32 => Operation {
@@ -993,17 +1003,17 @@ impl Cpu {
                 cycles: 6,
             },
             34 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::kil,
                 instruction: Instruction::KIL,
                 mode: AddressingMode::Implied,
                 bytes: 0,
                 cycles: 2,
             },
             35 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             36 => Operation {
@@ -1028,10 +1038,10 @@ impl Cpu {
                 cycles: 5,
             },
             39 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             40 => Operation {
@@ -1056,7 +1066,7 @@ impl Cpu {
                 cycles: 2,
             },
             43 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::anc,
                 instruction: Instruction::ANC,
                 mode: AddressingMode::Immediate,
                 bytes: 0,
@@ -1084,10 +1094,10 @@ impl Cpu {
                 cycles: 6,
             },
             47 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             48 => Operation {
@@ -1105,17 +1115,17 @@ impl Cpu {
                 cycles: 5,
             },
             50 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::kil,
                 instruction: Instruction::KIL,
                 mode: AddressingMode::Implied,
                 bytes: 0,
                 cycles: 2,
             },
             51 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             52 => Operation {
@@ -1140,10 +1150,10 @@ impl Cpu {
                 cycles: 6,
             },
             55 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::ZeroPageX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             56 => Operation {
@@ -1168,10 +1178,10 @@ impl Cpu {
                 cycles: 2,
             },
             59 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             60 => Operation {
@@ -1196,10 +1206,10 @@ impl Cpu {
                 cycles: 7,
             },
             63 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             64 => Operation {
@@ -1217,17 +1227,17 @@ impl Cpu {
                 cycles: 6,
             },
             66 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::kil,
                 instruction: Instruction::KIL,
                 mode: AddressingMode::Implied,
                 bytes: 0,
                 cycles: 2,
             },
             67 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             68 => Operation {
@@ -1252,10 +1262,10 @@ impl Cpu {
                 cycles: 5,
             },
             71 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             72 => Operation {
@@ -1308,10 +1318,10 @@ impl Cpu {
                 cycles: 6,
             },
             79 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             80 => Operation {
@@ -1336,10 +1346,10 @@ impl Cpu {
                 cycles: 2,
             },
             83 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             84 => Operation {
@@ -1364,10 +1374,10 @@ impl Cpu {
                 cycles: 6,
             },
             87 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::ZeroPageX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             88 => Operation {
@@ -1392,10 +1402,10 @@ impl Cpu {
                 cycles: 2,
             },
             91 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             92 => Operation {
@@ -1420,10 +1430,10 @@ impl Cpu {
                 cycles: 7,
             },
             95 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             96 => Operation {
@@ -1448,10 +1458,10 @@ impl Cpu {
                 cycles: 2,
             },
             99 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             100 => Operation {
@@ -1476,10 +1486,10 @@ impl Cpu {
                 cycles: 5,
             },
             103 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             104 => Operation {
@@ -1532,10 +1542,10 @@ impl Cpu {
                 cycles: 6,
             },
             111 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             112 => Operation {
@@ -1560,10 +1570,10 @@ impl Cpu {
                 cycles: 2,
             },
             115 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             116 => Operation {
@@ -1588,10 +1598,10 @@ impl Cpu {
                 cycles: 6,
             },
             119 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::ZeroPageX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             120 => Operation {
@@ -1616,10 +1626,10 @@ impl Cpu {
                 cycles: 2,
             },
             123 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             124 => Operation {
@@ -1644,10 +1654,10 @@ impl Cpu {
                 cycles: 7,
             },
             127 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             128 => Operation {
@@ -1672,10 +1682,10 @@ impl Cpu {
                 cycles: 2,
             },
             131 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sax,
                 instruction: Instruction::SAX,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             132 => Operation {
@@ -1700,10 +1710,10 @@ impl Cpu {
                 cycles: 3,
             },
             135 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sax,
                 instruction: Instruction::SAX,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 3,
             },
             136 => Operation {
@@ -1756,10 +1766,10 @@ impl Cpu {
                 cycles: 4,
             },
             143 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sax,
                 instruction: Instruction::SAX,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 4,
             },
             144 => Operation {
@@ -1812,10 +1822,10 @@ impl Cpu {
                 cycles: 4,
             },
             151 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::sax,
                 instruction: Instruction::SAX,
                 mode: AddressingMode::ZeroPageY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 4,
             },
             152 => Operation {
@@ -1896,10 +1906,10 @@ impl Cpu {
                 cycles: 2,
             },
             163 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             164 => Operation {
@@ -1924,10 +1934,10 @@ impl Cpu {
                 cycles: 3,
             },
             167 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 3,
             },
             168 => Operation {
@@ -1952,10 +1962,10 @@ impl Cpu {
                 cycles: 2,
             },
             171 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::Immediate,
-                bytes: 0,
+                bytes: 2,
                 cycles: 2,
             },
             172 => Operation {
@@ -1980,10 +1990,10 @@ impl Cpu {
                 cycles: 4,
             },
             175 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 4,
             },
             176 => Operation {
@@ -2008,10 +2018,10 @@ impl Cpu {
                 cycles: 2,
             },
             179 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             180 => Operation {
@@ -2036,10 +2046,10 @@ impl Cpu {
                 cycles: 4,
             },
             183 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::ZeroPageY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 4,
             },
             184 => Operation {
@@ -2092,10 +2102,10 @@ impl Cpu {
                 cycles: 4,
             },
             191 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 4,
             },
             192 => Operation {
@@ -2120,10 +2130,10 @@ impl Cpu {
                 cycles: 2,
             },
             195 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             196 => Operation {
@@ -2148,10 +2158,10 @@ impl Cpu {
                 cycles: 5,
             },
             199 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             200 => Operation {
@@ -2204,10 +2214,10 @@ impl Cpu {
                 cycles: 6,
             },
             207 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             208 => Operation {
@@ -2232,10 +2242,10 @@ impl Cpu {
                 cycles: 2,
             },
             211 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             212 => Operation {
@@ -2260,10 +2270,10 @@ impl Cpu {
                 cycles: 6,
             },
             215 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::ZeroPageX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             216 => Operation {
@@ -2288,10 +2298,10 @@ impl Cpu {
                 cycles: 2,
             },
             219 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             220 => Operation {
@@ -2316,10 +2326,10 @@ impl Cpu {
                 cycles: 7,
             },
             223 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             224 => Operation {
@@ -2344,10 +2354,10 @@ impl Cpu {
                 cycles: 2,
             },
             227 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::IndexedIndirect,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             228 => Operation {
@@ -2372,10 +2382,10 @@ impl Cpu {
                 cycles: 5,
             },
             231 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::ZeroPage,
-                bytes: 0,
+                bytes: 2,
                 cycles: 5,
             },
             232 => Operation {
@@ -2403,7 +2413,7 @@ impl Cpu {
                 function: Cpu::sbc,
                 instruction: Instruction::SBC,
                 mode: AddressingMode::Immediate,
-                bytes: 0,
+                bytes: 2,
                 cycles: 2,
             },
             236 => Operation {
@@ -2428,10 +2438,10 @@ impl Cpu {
                 cycles: 6,
             },
             239 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::Absolute,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             240 => Operation {
@@ -2456,10 +2466,10 @@ impl Cpu {
                 cycles: 2,
             },
             243 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::IndirectIndexed,
-                bytes: 0,
+                bytes: 2,
                 cycles: 8,
             },
             244 => Operation {
@@ -2484,10 +2494,10 @@ impl Cpu {
                 cycles: 6,
             },
             247 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::ZeroPageX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 6,
             },
             248 => Operation {
@@ -2512,10 +2522,10 @@ impl Cpu {
                 cycles: 2,
             },
             251 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
             252 => Operation {
@@ -2540,13 +2550,85 @@ impl Cpu {
                 cycles: 7,
             },
             255 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 0,
+                bytes: 2,
                 cycles: 7,
             },
         }
+    }
+
+    // ILLEGAL OpCode
+    fn ahx(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn alr(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn anc(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn arr(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn axs(&mut self, _step: &Step) {
+    }
+
+    // dcp OpCode
+    fn dcp(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn isc(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn kil(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn las(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn rla(&mut self, _step: &Step) {
+    }
+
+    // rra OpCode
+    fn rra(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn sax(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn shx(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn shy(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn slo(&mut self, _step: &Step) {
+    }
+
+    // sre OpCode
+    fn sre(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn tas(&mut self, _step: &Step) {
+    }
+
+    // ILLEGAL OpCode
+    fn xaa(&mut self, _step: &Step) {
     }
 }
 
