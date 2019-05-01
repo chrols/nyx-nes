@@ -1,5 +1,6 @@
 use std::fmt;
 use super::ines;
+use super::ppu::Ppu;
 
 pub struct Cpu {
     a: u8,
@@ -16,6 +17,7 @@ pub struct Cpu {
     v: bool, // Overflow flag
     n: bool, // Negative flag
     pub rom: Option<ines::File>,
+    ppu: Ppu,
 }
 
 impl fmt::Debug for Cpu {
@@ -167,6 +169,7 @@ impl Cpu {
             v: false,
             n: false,
             rom: None,
+            ppu: Ppu::new(),
         }
     }
 
@@ -274,10 +277,9 @@ impl Cpu {
 
     // Branch if Overflow Clear
     fn brk(&mut self, _step: &Step) {
-        let m1 = self.memory_read(0x02);
-        let m2 = self.memory_read(0x03);
-        println!("{:X} {:X}", m1, m2);
-        panic!("Unimplemented");
+        self.push_word(self.pc);
+        self.php(&Step::new());
+        self.pc = self.read_word(0xFFFE);
     }
 
     // Branch if Overflow Clear
@@ -626,14 +628,27 @@ impl Cpu {
         panic!("Halt and catch fire!");
     }
 
+    pub fn nmi(&mut self) {
+        println!("NMI!");
+        if self.i {
+            return;
+        }
+        self.push_word(self.pc);
+        self.php(&Step::new());
+        self.pc = self.read_word(0xFFFA);
+    }
+
+    fn irq(&mut self) {
+        self.push_word(self.pc - 1);
+        self.pc = self.read_word(0xFFFE);
+    }
+
     fn memory_read(&self, address: u16) -> u8 {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize],
-            0x2000...0x3FFF => {
-                println!("PPU Unimplemented");
-                0x80
-            }
-            0x4000...0x401F => panic!("APU Unimplemented"),
+            0x2000...0x3FFF => self.ppu.read(address),
+            0x4000...0x4017 => { println!("APU Unimplemented"); 0 }
+            0x4018...0x401F => panic!("Read from disabled registers"),
             0x4020...0xFFFF => match &self.rom {
                 Some(game) => match game.mapper {
                     0 => game.prg_rom[(address as usize - if game.prg_rom_blocks == 1 { 0xC000} else { 0x8000 } as usize)],
@@ -662,7 +677,22 @@ impl Cpu {
     fn memory_write(&mut self, address: u16, byte: u8) {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize] = byte,
+            0x2000...0x3FFF => self.ppu.write(address, byte),
+            0x4000...0x4013 => println!("APU Unimplemented"),
+            0x4014 => self.oam_dma(byte),
+            0x4016...0x4017 => println!("APU Unimplemented"),
+            0x4016...0x4017 => println!("Gamepad unimplemented"),
+            0x4018...0x401F => println!("Write to disabled memory area"),
             _ => (),
+        }
+    }
+
+    fn oam_dma(&mut self, byte: u8) {
+        let offset = (byte as u16) << 8;
+        for i in 0..256 {
+            let address = i + offset;
+            let oam_byte = self.memory_read(address);
+            self.ppu.write(0x2004, oam_byte);
         }
     }
 

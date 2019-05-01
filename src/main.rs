@@ -1,5 +1,6 @@
 mod cpu;
 mod ines;
+mod ppu;
 use std::env;
 
 fn sprite(chr_data: &[u8]) -> Vec<u8> {
@@ -28,7 +29,10 @@ fn main() {
         cpu.rom = Some(rom_file);
         cpu.reset();
         loop {
-            cpu.cycle();
+            for i in (0..21700) {
+                cpu.cycle();
+            }
+            cpu.nmi();
         }
     } else {
         cpu::Cpu::kevtris_nestest();
