@@ -17,7 +17,7 @@ pub struct Cpu {
     v: bool, // Overflow flag
     n: bool, // Negative flag
     pub rom: Option<ines::File>,
-    ppu: Ppu,
+    pub ppu: Ppu,
 }
 
 impl fmt::Debug for Cpu {
@@ -397,7 +397,7 @@ impl Cpu {
     }
 
     // Return from interrupt
-    fn rti(&mut self, step: &Step) {
+    fn rti(&mut self, _step: &Step) {
         let flags = self.pop();
         self.set_flags(flags);
         self.pc = self.pop_word();
@@ -680,7 +680,7 @@ impl Cpu {
             0x2000...0x3FFF => self.ppu.write(address, byte),
             0x4000...0x4013 => println!("APU Unimplemented"),
             0x4014 => self.oam_dma(byte),
-            0x4016...0x4017 => println!("APU Unimplemented"),
+            0x4015 => println!("APU Unimplemented"),
             0x4016...0x4017 => println!("Gamepad unimplemented"),
             0x4018...0x401F => println!("Write to disabled memory area"),
             _ => (),
@@ -788,7 +788,6 @@ impl Cpu {
             AddressingMode::Indirect =>  self.read_word_bug(self.read_word(self.pc +1)),
             AddressingMode::IndirectIndexed =>  self.read_word_bug(self.memory_read(self.pc.wrapping_add(1)) as u16).wrapping_add(self.y as u16),
             AddressingMode::IndexedIndirect =>  self.read_word_bug(self.memory_read(self.pc.wrapping_add(1)) as u16).wrapping_add(self.x as u16),
-            _ => panic!("Unimplemented addressing! {:?}", mode),
         }
     }
 

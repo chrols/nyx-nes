@@ -5,3 +5,5 @@ authors = ["Christian Olsson <chrols@chrols.se>"]
 edition = "2018"
 
 [dependencies]
+sdl2 = "~0.32.1"
+rand = "0.6.5"
