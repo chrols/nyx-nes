@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
@@ -19,11 +20,11 @@ use sdl2::video::Window;
 static DISP_WIDTH: u32 = 256;
 static DISP_HEIGHT: u32 = 240;
 
-static SCREEN_W: u32 = 256 * 4;
-static SCREEN_H: u32 = 240 * 4;
+static SCREEN_W: u32 = 1024 ;
+static SCREEN_H: u32 = 960 ;
 
-static BLOCK_W: usize = 2;
-static BLOCK_H: usize = 2;
+static BLOCK_W: usize = 4;
+static BLOCK_H: usize = 4;
 
 pub struct EmulatorWindow {
     window: u32,
@@ -38,7 +39,7 @@ fn convert_color(color: ppu::Color) -> Color {
 fn render(canvas: &mut Canvas<Window>, ppu: &Ppu) {
     let bg_color = Color::RGB(0, 0, 0);
 
-    println!("Color frame");
+    //println!("Color frame");
     
     canvas.set_draw_color(bg_color);
     canvas.clear();
@@ -87,14 +88,16 @@ pub fn execute(cpu: &mut Cpu) {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
-                // Event::KeyDown {
-                //     scancode: Some(sc), ..
-                // } => {
-                //     if let Some(x) = translate_scancode(sc) {
-                //         println!("Key down {}", x);
-                //         //cpu.key_down(x);
-                //     }
-                // }
+                Event::KeyDown {
+                    keycode: Some(kc), ..
+                } => {
+                    match kc {
+                        Keycode::A => cpu.ppu.dump_pattern_tables(),
+                        Keycode::O => cpu.ppu.dump_oam(),
+                        Keycode::E => cpu.ppu.dump_nametables(),                                                
+                        _ => (),
+                    }
+                }
                 // Event::KeyUp {
                 //     scancode: Some(sc), ..
                 // } => {

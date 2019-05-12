@@ -1,18 +1,7 @@
 //! http://wiki.nesdev.com/w/index.php/PPU_rendering
 
 use std::cell::Cell;
-
-// Memory map
-
-// PPUCTRL 	$2000 	VPHB SINN 	NMI enable (V), PPU master/slave (P), sprite height (H), background tile select (B), sprite tile select (S), increment mode (I), nametable select (NN)
-// PPUMASK 	$2001 	BGRs bMmG 	color emphasis (BGR), sprite enable (s), background enable (b), sprite left column enable (M), background left column enable (m), greyscale (G)
-// PPUSTATUS 	$2002 	VSO- ---- 	vblank (V), sprite 0 hit (S), sprite overflow (O); read resets write pair for $2005/$2006
-// OAMADDR 	$2003 	aaaa aaaa 	OAM read/write address
-// OAMDATA 	$2004 	dddd dddd 	OAM data read/write
-// PPUSCROLL 	$2005 	xxxx xxxx 	fine scroll position (two writes: X scroll, Y scroll)
-// PPUADDR 	$2006 	aaaa aaaa 	PPU read/write address (two writes: most significant byte, least significant byte)
-// PPUDATA 	$2007 	dddd dddd 	PPU data read/write
-// OAMDMA 	$4014 	aaaa aaaa 	OAM DMA high address
+use super::ines;
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -20,20 +9,7 @@ const SCANLINES_PER_FRAME: usize = 262;
 /// Each scanline lasts for 341 PPU clock cycles
 const CYCLES_PER_SCANLINE: usize = 341;
 
-/// The PPU contains the following:
-
-///     Background
-///         VRAM address, temporary VRAM address, fine X scroll, and first/second write toggle - This controls the addresses that the PPU reads during background rendering. See PPU scrolling.
-///         2 16-bit shift registers - These contain the bitmap data for two tiles. Every 8 cycles, the bitmap data for the next tile is loaded into the upper 8 bits of this shift register. Meanwhile, the pixel to render is fetched from one of the lower 8 bits.
-///         2 8-bit shift registers - These contain the palette attributes for the lower 8 pixels of the 16-bit shift register. These registers are fed by a latch which contains the palette attribute for the next tile. Every 8 cycles, the latch is loaded with the palette attribute for the next tile.
-///     Sprites
-///         Primary OAM (holds 64 sprites for the frame)
-///         Secondary OAM (holds 8 sprites for the current scanline)
-///         8 pairs of 8-bit shift registers - These contain the bitmap data for up to 8 sprites, to be rendered on the current scanline. Unused sprites are loaded with an all-transparent bitmap.
-///         8 latches - These contain the attribute bytes for up to 8 sprites.
-///         8 counters - These contain the X positions for up to 8 sprites.
-
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -47,6 +23,26 @@ impl Color {
 
     pub fn RGB(r: u8, g: u8, b: u8) -> Color {
         Color { r, g, b }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct OamData {
+    top: u8,
+    index: u8,
+    attr: u8,
+    left: u8,
+}
+
+impl OamData {
+    fn new()  -> OamData {
+        OamData {top:0,index:0,attr:0,left:0}
+    }
+
+    fn contains(&self, x: u8, y: u8) -> bool {
+        let x_hit = x >= self.left && x < (self.left + 8);
+        let y_hit = y >= self.top && y < (self.top + 8);
+        x_hit && y_hit
     }
 }
 
@@ -74,6 +70,8 @@ pub struct Ppu {
     bg_pattern_offset: bool,
     tile_low: u8,
     tile_high: u8,
+    sprite_offset: bool,
+    pub rom: Option<ines::File>,
 }
 
 impl Ppu {
@@ -99,6 +97,8 @@ impl Ppu {
             bg_pattern_offset: false,
             tile_low: 0,
             tile_high: 0,
+            sprite_offset: false,
+            rom: None,
         }
     }
 
@@ -121,7 +121,8 @@ impl Ppu {
             6 => self.write_address(byte),
             7 => {
                 self.write_memory(self.address, byte);
-                self.address.wrapping_add(1);
+                println!("PPUWDATA: {:04X}", self.address);
+                self.address = self.address.wrapping_add(1);
             }
             _ => panic!("Unimplemented register: {:X}", address % 8),
         }
@@ -155,55 +156,6 @@ impl Ppu {
     }
 
     /// Render a visible scanline
-
-    // Cycle 0
-
-    // This is an idle cycle. The value on the PPU address bus during this cycle appears to be the same CHR address that is later used to fetch the low background tile byte starting at dot 5 (possibly calculated during the two unused NT fetches at the end of the previous scanline).
-
-    // Cycles 257-320
-
-    // The tile data for the sprites on the next scanline are fetched
-    // here. Again, each memory access takes 2 PPU cycles to complete, and
-    // 4 are performed for each of the 8 sprites:
-
-    //     Garbage nametable byte
-    //     Garbage nametable byte
-    //     Tile bitmap low
-    //     Tile bitmap high (+8 bytes from tile bitmap low)
-
-    // The garbage fetches occur so that the same circuitry that performs the BG tile fetches could be reused for the sprite tile fetches.
-
-    // If there are less than 8 sprites on the next scanline, then dummy
-    // fetches to tile $FF occur for the left-over sprites, because of the
-    // dummy sprite data in the secondary OAM (see sprite
-    // evaluation). This data is then discarded, and the sprites are
-    // loaded with a transparent bitmap instead.
-
-    // In addition to this, the X positions and attributes for each sprite are loaded from the secondary OAM into their respective counters/latches. This happens during the second garbage nametable fetch, with the attribute byte loaded during the first tick and the X coordinate during the second.
-    // Cycles 321-336
-
-    // This is where the first two tiles for the next scanline are
-    // fetched, and loaded into the shift registers. Again, each memory
-    // access takes 2 PPU cycles to complete, and 4 are performed for the
-    // two tiles:
-
-    //     Nametable byte
-    //     Attribute table byte
-    //     Tile bitmap low
-    //     Tile bitmap high (+8 bytes from tile bitmap low)
-
-    // Cycles 337-340
-
-    // Two bytes are fetched, but the purpose for this is unknown. These
-    // fetches are 2 PPU cycles each.
-
-    //     Nametable byte
-    //     Nametable byte
-
-    // Both of the bytes fetched here are the same nametable byte that
-    // will be fetched at the beginning of the next scanline (tile 3, in
-    // other words). At least one mapper is known to use this string of
-    // three consecutive nametable fetches to clock a scanline counter.
     fn visible_scanline_cycle(&mut self) {
         match self.current_cycle {
             0 => (),
@@ -215,39 +167,18 @@ impl Ppu {
         }
     }
 
-    // Cycles 1-256
 
-    // The data for each tile is fetched during this phase. Each
-    // memory access takes 2 PPU cycles to complete, and 4 must be
-    // performed per tile:
+    fn read_tile_address(&self) -> u16 {
+        let mut addr = 0x10 * self.nametable as u16;
+        addr += (self.scanline as u16 - 1) % 8;
 
-    //     Nametable byte
-    //     Attribute table byte
-    //     Tile bitmap low
-    //     Tile bitmap high (+8 bytes from tile bitmap low)
+        if self.bg_pattern_offset {
+            addr += 0x1000
+        }
 
-    // The data fetched from these accesses is placed into internal
-    // latches, and then fed to the appropriate shift registers when
-    // it's time to do so (every 8 cycles). Because the PPU can only
-    // fetch an attribute byte every 8 cycles, each sequential string
-    // of 8 pixels is forced to have the same palette attribute.
+        addr
+    }
 
-    // Sprite zero hits act as if the image starts at cycle 2 (which
-    // is the same cycle that the shifters shift for the first time),
-    // so the sprite zero flag will be raised at this point at the
-    // earliest. Actual pixel output is delayed further due to
-    // internal render pipelining, and the first pixel is output
-    // during cycle 4.
-
-    // The shifters are reloaded during ticks 9, 17, 25, ..., 257.
-
-    // Note: At the beginning of each scanline, the data for the first
-    // two tiles is already loaded into the shift registers (and ready
-    // to be rendered), so the first tile that gets fetched is Tile 3.
-
-    // While all of this is going on, sprite evaluation for the next
-    // scanline is taking place as a seperate process, independent to
-    // what's happening here.
     fn visible_scanline_render_cycle(&mut self) {
         self.render_pixel();
 
@@ -255,9 +186,7 @@ impl Ppu {
             7 => {
                 self.nametable = self.read_memory(self.address); // Nametable byte
                 self.attribute_table = self.fetch_attribute_table(); // Attribute table byte
-                let tile_address = if self.bg_pattern_offset { 0x1000 } else { 0 }
-                    + 0x10 * self.nametable as u16
-                    + (self.scanline as u16 - 1) % 8;
+                let tile_address = self.read_tile_address();
                 self.tile_low = self.read_memory(tile_address);
                 self.tile_high = self.read_memory(tile_address + 8);
             }
@@ -278,24 +207,149 @@ impl Ppu {
         self.vram[self.address as usize]
     }
 
-    fn render_pixel(&mut self) {
-        let x = self.current_cycle - 1;
-        let y = self.scanline - 1;
 
-        let low = (self.tile_low >> (x % 8)) & 0x01;
-        let high = (self.tile_high >> (x % 8)) & 0x01;
+    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Color {
+        let mut tile_addr = ((oam.index as u16) << 4);
 
-        let color = match (low + high) {
+        if self.sprite_offset {
+            tile_addr += 0x1000;
+        }
+
+        let x_offset = x - oam.left;
+        let y_offset = y - oam.top;
+
+        let low_byte = self.read_memory(tile_addr  + y_offset as u16 );
+        let high_byte = self.read_memory(tile_addr + y_offset as u16  + 8);
+
+        let pixel = ((low_byte >> (x_offset as u8)) & 0x01) + 2 * ((high_byte >> (x_offset as u8)) & 0x01);
+
+        match pixel {
             0 => Color::RGB(0,0,0),
             1 => Color::RGB(255,0,0),
             2 => Color::RGB(0,255,0),
             3 => Color::RGB(0,0,255),
-            _ => panic!("Invalid result: {:X}", low + high),
-        };
+            _ => panic!("Invalid result: {:X}", low_byte + high_byte),
+        }
+    }
 
-        if (low + high) != 0 { println!("Color yay"); }
-        
-        self.canvas[(y * 256 + x) as usize] = color;
+
+    pub fn dump_memory(&mut self, addr: u16, blocks: usize) {
+        let mut addr = addr;
+        for i in 0..blocks {
+            print!("{:04X}:", addr);
+            for j in 0..16 {
+                print!(" {:02X}", self.read_memory(addr));
+                addr += 1;
+            }
+            println!("");
+        }
+    }
+
+    pub fn dump_pattern_tables(&mut self) {
+        self.dump_memory(0x0000, 512);
+    }
+
+    pub fn dump_nametables(&mut self) {
+        self.dump_memory(0x2000, 256);
+    }
+
+    pub fn dump_oam(&mut self) {
+        let mut addr = 0;
+        for i in 0..64 {
+            print!("{:04X}:", addr);
+            for j in 0..4 {
+                print!(" {:02X}", self.oam[i*4+j]);
+                addr += 1;
+            }
+            println!("");
+        }
+    }
+
+
+    fn read_oam(&self, oam_addr: usize) -> OamData {
+        OamData {
+            top: self.oam[oam_addr],
+            index: self.oam[oam_addr+1],
+            attr: self.oam[oam_addr+2],
+            left: self.oam[oam_addr+3],
+        }
+    }
+
+    fn sprite_pixel(&mut self) -> Color {
+        let x = (self.current_cycle - 1) as u8;
+        let y = (self.scanline - 1) as u8;
+
+        for i in 0..64 {
+            let oam = self.read_oam(i*4);
+            if oam.contains(x, y) {
+                // println!("Sprite color: {:?}", self.sprite_color(x, y, i % 4));
+                return self.sprite_color(x, y, oam);
+            }
+        }
+
+        Color::RGB(0,0,0)
+    }
+
+
+    fn chr_pixel(&mut self) -> Color {
+        let x = (self.current_cycle - 1) as u16;
+        let y = (self.scanline - 1) as u16;
+
+
+        let sprite_addr = ((x / 8) * 16 + (y / 8) *  32 * 16 + (y % 8));
+
+        let low_byte = self.read_memory(sprite_addr);
+        let high_byte = self.read_memory(sprite_addr + 8);
+
+        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x % 8) as u8);
+
+        match pixel {
+            0 => Color::RGB(0,0,0),
+            1 => Color::RGB(255,0,0),
+            2 => Color::RGB(0,255,0),
+            3 => Color::RGB(0,0,255),
+            _ => panic!("Invalid result: {:X}", low_byte + high_byte),
+        }
+    }
+
+
+    fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
+        ((low >> ((8-x) as u8)) & 0x01) + 2 * ((high >> ((8 - x) as u8)) & 0x01)
+    }
+
+    fn bg_pixel(&mut self) -> Color {
+        let x = (self.current_cycle - 1) as u16;
+        let y = (self.scanline - 1) as u16;
+
+
+        let index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
+        let index = self.read_memory(index_addr);
+        let tile_addr = (index as u16) << 4;
+        println!("Tile addr {:X}", tile_addr);
+
+        self.tile_high = self.read_memory(tile_addr+ (y % 8) + 8);
+        self.tile_low = self.read_memory(tile_addr + (y % 8));
+
+        // println!("{:X} {:X}", self.tile_high, self.tile_low);
+        let color = Ppu::bytes_to_pixel(self.tile_high, self.tile_low, (x % 8) as u8);
+
+        match color {
+            0 => Color::RGB(0,0,0),
+            1 => Color::RGB(255,0,0),
+            2 => Color::RGB(0,255,0),
+            3 => Color::RGB(0,0,255),
+            _ => panic!("Invalid result: {:X}", color),
+        }
+    }
+
+    fn render_pixel(&mut self) {
+        let x = self.current_cycle - 1;
+        let y = self.scanline - 1;
+
+
+        //self.canvas[(y * 256 + x) as usize] = self.sprite_pixel();
+        self.canvas[(y * 256 + x) as usize] = self.bg_pixel();
+        //self.canvas[(y * 256 + x) as usize] = self.chr_pixel();
     }
 
     // Each attribute table, starting at $23C0, $27C0, $2BC0, or $2FC0, is arranged as an 8x8 byte array:
@@ -325,6 +379,8 @@ impl Ppu {
         self.nmi = (0x80 & byte) != 0;
         //self.slave = (0x40 & byte) != 0;
         // FIXME
+
+        self.sprite_offset = (0x04 & byte) != 0;
     }
 
     /// 7  bit  0
@@ -345,16 +401,16 @@ impl Ppu {
 
     fn write_oamdata(&mut self, byte: u8) {
         self.oam[self.oam_addr as usize] = byte;
-        self.oam_addr.wrapping_add(1);
+        self.oam_addr = self.oam_addr.wrapping_add(1);
     }
 
     fn write_address(&mut self, byte: u8) {
         println!("PPUADDR: {:X}", byte);
         if self.low_address {
-            self.address = byte as u16;
+            self.address |= byte as u16;
             self.low_address = false;
         } else {
-            self.address |= (byte as u16) << 8;
+            self.address = (byte as u16) << 8;
             self.low_address = true;
         }
     }
@@ -381,14 +437,21 @@ impl Ppu {
     /// $3F20-$3FFF 	$00E0 	Mirrors of $3F00-$3F1F
     fn read_memory(&mut self, address: u16) -> u8 {
         match address {
-            0x0000...0x3FFF => self.vram[address as usize],
+            0x0000...0x1FFF => match &self.rom {
+                Some(game) => {
+                    game.chr_rom[address as usize]
+                },
+                None => panic!("No game loaded"),
+            },
+            0x2000...0x3FFF => self.vram[address as usize],
             _ => panic!("Unimplemented PPU address: {:X}", address),
         }
     }
 
     fn write_memory(&mut self, address: u16, byte: u8) {
         match address {
-            0x0000...0x2FFF => self.vram[address as usize] = byte,
+            0x0000...0x1FFF => println!("Write to rom ${:04X}!", address),
+            0x2000...0x2FFF => self.vram[address as usize] = byte,
             0x3000...0x3EFF => self.vram[address as usize - 0x1000] = byte,
             0x3F00...0x3F1F => self.vram[address as usize] = byte,
             0x3F20...0x3FFF => self.vram[address as usize] = byte, // FIXME
@@ -538,10 +601,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn render_first_pixel_bg() {
+    fn alternating_ppuaddr() {
         let mut ppu = Ppu::new();
-        ppu.scanline = 1;
-        ppu.current_cycle = 1;
-        ppu.cycle();
+        ppu.write_address(0x20);
+        ppu.write_address(0x10);
+        assert_eq!(0x2010, ppu.address);
     }
 }

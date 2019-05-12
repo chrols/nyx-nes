@@ -629,7 +629,7 @@ impl Cpu {
     }
 
     pub fn nmi(&mut self) {
-        println!("NMI!");
+        //println!("NMI!");
         if self.i {
             return;
         }
@@ -734,7 +734,7 @@ impl Cpu {
 
         let decoded_address = self.decode_address(&fluff.mode);
 
-        self.print_state(&fluff);
+        //self.print_state(&fluff);
 
         let step = Step {
             address: decoded_address,

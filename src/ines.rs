@@ -1,10 +1,12 @@
 use std::fs;
 
+#[derive(Copy, Clone, Debug)]
 pub enum Mirroring {
     Horizontal,
     Vertical,
 }
 
+#[derive(Clone, Debug)]
 pub struct File {
     pub prg_rom_blocks: u8,
     pub chr_rom_blocks: u8,    

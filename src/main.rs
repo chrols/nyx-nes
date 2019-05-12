@@ -27,7 +27,12 @@ fn main() {
     if args.len() > 1 {
         let filename = &args[1];
         let rom_file = ines::File::read(filename);
+
+        let copy = rom_file.clone();
+
         cpu.rom = Some(rom_file);
+        cpu.ppu.rom = Some(copy);
+
         cpu.reset();
         gui::execute(&mut cpu);
     } else {
