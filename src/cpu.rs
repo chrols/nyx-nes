@@ -1,6 +1,7 @@
 use std::fmt;
 use super::ines;
 use super::ppu::Ppu;
+use super::gamepad::Gamepad;
 
 pub struct Cpu {
     a: u8,
@@ -18,6 +19,8 @@ pub struct Cpu {
     n: bool, // Negative flag
     pub rom: Option<ines::File>,
     pub ppu: Ppu,
+    pub cyc: u64,
+    pub gamepad: Gamepad,
 }
 
 impl fmt::Debug for Cpu {
@@ -170,6 +173,8 @@ impl Cpu {
             n: false,
             rom: None,
             ppu: Ppu::new(),
+            cyc: 0,
+            gamepad: Gamepad::new(),
         }
     }
 
@@ -357,6 +362,7 @@ impl Cpu {
                 self.a |= 0x01;
             }
             self.c = nc;
+            self.set_zn(self.a);
         } else {
             let mut m = self.memory_read(step.address);
             let nc = (m & 0x80) != 0;
@@ -366,6 +372,7 @@ impl Cpu {
             }
             self.memory_write(step.address, m);
             self.c = nc;
+            self.set_zn(m);
         }
     }
 
@@ -629,10 +636,8 @@ impl Cpu {
     }
 
     pub fn nmi(&mut self) {
-        //println!("NMI!");
-        if self.i {
-            return;
-        }
+        println!("NMI!");
+
         self.push_word(self.pc);
         self.php(&Step::new());
         self.pc = self.read_word(0xFFFA);
@@ -647,7 +652,9 @@ impl Cpu {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize],
             0x2000...0x3FFF => self.ppu.read(address),
-            0x4000...0x4017 => { println!("APU Unimplemented"); 0 }
+            0x4000...0x4015 => { println!("APU Unimplemented"); 0 }
+            0x4016 => { self.gamepad.read() }
+            0x4017 => { println!("Gamepad 2 {:X}", address); 0},
             0x4018...0x401F => panic!("Read from disabled registers"),
             0x4020...0xFFFF => match &self.rom {
                 Some(game) => match game.mapper {
@@ -681,7 +688,14 @@ impl Cpu {
             0x4000...0x4013 => println!("APU Unimplemented"),
             0x4014 => self.oam_dma(byte),
             0x4015 => println!("APU Unimplemented"),
-            0x4016...0x4017 => println!("Gamepad unimplemented"),
+            0x4016 => {
+                if (0x01 & byte) == 1 {
+                    self.gamepad.start_poll();
+                } else {
+                    self.gamepad.stop_poll();
+                }
+            },
+            0x4017 => println!("Gamepad {:X} = {:X}", address, byte),
             0x4018...0x401F => println!("Write to disabled memory area"),
             _ => (),
         }
@@ -748,6 +762,7 @@ impl Cpu {
         let exec = fluff.function;
 
         exec(self, &step);
+        self.cyc += 1;
     }
 
     fn print_state(&self, op: &Operation) {
@@ -757,7 +772,7 @@ impl Cpu {
             op_bytes = op_bytes + &format!("{:02X} ", self.memory_read(self.pc + i as u16));
         }
 
-        println!("{:04X}  {:<9} {:<31} A:{:02X} X:{:02X} Y:{:02X} P:?? SP:{:02X} PPU:???,??? CYC:???", self.pc, op_bytes, format!("{:?}", op.instruction), self.a, self.x, self.y, self.sp);
+        println!("{:04X}  {:<9} {:<31} A:{:02X} X:{:02X} Y:{:02X} P:?? SP:{:02X} PPU:???,??? CYC:{}", self.pc, op_bytes, format!("{:?}", op.instruction), self.a, self.x, self.y, self.sp, self.cyc);
     }
 
 
@@ -2727,4 +2742,33 @@ mod tests {
         assert_eq!(cpu.pc, 0xBEEF);
         assert_eq!(cpu.sp, 0xFF);
     }
+
+    #[test]
+    fn lsr() {
+        let mut cpu = Cpu::new();
+        cpu.a = 0b01010101;
+        let mut step = Step::new();
+        step.mode = AddressingMode::Accumulator;
+        cpu.lsr(&step);
+
+        assert_eq!(cpu.a, 0b00101010);
+        assert_eq!(cpu.c, true); // 1 was shifted out
+        assert_eq!(cpu.n, false); // 0 was shifted in
+    }
+
+    #[test]
+    fn rol() {
+        let mut cpu = Cpu::new();
+        cpu.a = 0b01010101;
+        cpu.c = true;
+        let mut step = Step::new();
+        step.mode = AddressingMode::Accumulator;
+        cpu.rol(&step);
+
+        assert_eq!(cpu.a, 0b10101011);
+        assert_eq!(cpu.c, false);
+        assert_eq!(cpu.n, true);
+    }
+
+
 }

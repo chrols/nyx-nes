@@ -94,18 +94,33 @@ pub fn execute(cpu: &mut Cpu) {
                     match kc {
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
                         Keycode::O => cpu.ppu.dump_oam(),
-                        Keycode::E => cpu.ppu.dump_nametables(),                                                
+                        Keycode::E => cpu.ppu.dump_nametables(),
+                        Keycode::U => cpu.gamepad.dump_buttons(),
+                        Keycode::Left => cpu.gamepad.left = true,
+                        Keycode::Right => cpu.gamepad.right = true,
+                        Keycode::Up => cpu.gamepad.up = true,
+                        Keycode::Down => cpu.gamepad.down = true,
+                        Keycode::Return => { println!("PRESS!"); cpu.gamepad.start = true },
+                        Keycode::Z => cpu.gamepad.a = true,
+                        Keycode::V => cpu.gamepad.b = true,
+
                         _ => (),
                     }
                 }
-                // Event::KeyUp {
-                //     scancode: Some(sc), ..
-                // } => {
-                //     if let Some(x) = translate_scancode(sc) {
-                //         println!("Key up {}", x);
-                //         //cpu.key_up(x);
-                //     }
-                // }
+                Event::KeyUp {
+                    keycode: Some(kc), ..
+                } => {
+                    match kc {
+                        Keycode::Left => cpu.gamepad.left = false,
+                        Keycode::Right => cpu.gamepad.right = false,
+                        Keycode::Up => cpu.gamepad.up = false,
+                        Keycode::Down => cpu.gamepad.down = false,
+                        Keycode::Return => cpu.gamepad.start = false,
+                        Keycode::Z => cpu.gamepad.a = false,
+                        Keycode::V => cpu.gamepad.b = false,
+                        _ => (),
+                    }
+                }
                 _ => {}
             }
         }
@@ -115,18 +130,23 @@ pub fn execute(cpu: &mut Cpu) {
             render(&mut canvas, &cpu.ppu);
             cpu.ppu.updated = false;
         }
-        
+
         cpu.cycle();
         cpu.ppu.cycle();
         cpu.ppu.cycle();
         cpu.ppu.cycle();
-        
-        if tick.elapsed() >= Duration::new(0, 1_000_000_000u32 / 10) {
-            tick = Instant::now();
+
+        if cpu.cyc % 29829 == 0 {
             cpu.ppu.vblank();
             cpu.nmi();
         }
 
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 1_700_000u32));
+        // if tick.elapsed() >= Duration::new(0, 1_000_000_000u32 / 10) {
+        //     tick = Instant::now();
+        //     cpu.ppu.vblank();
+        //     cpu.nmi();
+        // }
+
+        //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 1_700_000u32));
     }
 }

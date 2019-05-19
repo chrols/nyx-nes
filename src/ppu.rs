@@ -2,6 +2,7 @@
 
 use std::cell::Cell;
 use super::ines;
+use std::panic;
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -115,7 +116,7 @@ impl Ppu {
         match address % 8 {
             0 => self.write_ppuctrl(byte),
             1 => self.write_ppumask(byte),
-            3 => self.oam_addr = byte,
+            3 => {println!("OAMADDR: {:X}", byte); self.oam_addr = byte},
             4 => self.write_oamdata(byte),
             5 => self.write_scroll(byte),
             6 => self.write_address(byte),
@@ -184,11 +185,11 @@ impl Ppu {
 
         match self.current_cycle {
             7 => {
-                self.nametable = self.read_memory(self.address); // Nametable byte
-                self.attribute_table = self.fetch_attribute_table(); // Attribute table byte
-                let tile_address = self.read_tile_address();
-                self.tile_low = self.read_memory(tile_address);
-                self.tile_high = self.read_memory(tile_address + 8);
+                //self.nametable = self.read_memory(self.address); // Nametable byte
+                //self.attribute_table = self.fetch_attribute_table(); // Attribute table byte
+                //let tile_address = self.read_tile_address();
+                //self.tile_low = self.read_memory(tile_address);
+                //self.tile_high = self.read_memory(tile_address + 8);
             }
             _ => (),
         }
@@ -246,14 +247,17 @@ impl Ppu {
     }
 
     pub fn dump_pattern_tables(&mut self) {
+        println!("--- Pattern tables ---");
         self.dump_memory(0x0000, 512);
     }
 
     pub fn dump_nametables(&mut self) {
+        println!("--- Name tables ---");
         self.dump_memory(0x2000, 256);
     }
 
     pub fn dump_oam(&mut self) {
+        println!("--- OAM ---");
         let mut addr = 0;
         for i in 0..64 {
             print!("{:04X}:", addr);
@@ -314,7 +318,8 @@ impl Ppu {
 
 
     fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
-        ((low >> ((8-x) as u8)) & 0x01) + 2 * ((high >> ((8 - x) as u8)) & 0x01)
+        let x_offset = 7 - x;
+        ((low >> x_offset) & 0x01) + 2 * ((high >> x_offset) & 0x01)
     }
 
     fn bg_pixel(&mut self) -> Color {
@@ -325,7 +330,7 @@ impl Ppu {
         let index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
         let index = self.read_memory(index_addr);
         let tile_addr = (index as u16) << 4;
-        println!("Tile addr {:X}", tile_addr);
+        // println!("Tile addr {:X}", tile_addr);
 
         self.tile_high = self.read_memory(tile_addr+ (y % 8) + 8);
         self.tile_low = self.read_memory(tile_addr + (y % 8));
@@ -400,6 +405,7 @@ impl Ppu {
     }
 
     fn write_oamdata(&mut self, byte: u8) {
+        println!("OAM {:X} = {:X}", self.oam_addr, byte);
         self.oam[self.oam_addr as usize] = byte;
         self.oam_addr = self.oam_addr.wrapping_add(1);
     }
@@ -444,18 +450,18 @@ impl Ppu {
                 None => panic!("No game loaded"),
             },
             0x2000...0x3FFF => self.vram[address as usize],
-            _ => panic!("Unimplemented PPU address: {:X}", address),
+            0x4000...0xFFFF => self.read_memory(address % 0x4000),
         }
     }
 
     fn write_memory(&mut self, address: u16, byte: u8) {
-        match address {
+        match address % 0x4000 {
             0x0000...0x1FFF => println!("Write to rom ${:04X}!", address),
             0x2000...0x2FFF => self.vram[address as usize] = byte,
             0x3000...0x3EFF => self.vram[address as usize - 0x1000] = byte,
             0x3F00...0x3F1F => self.vram[address as usize] = byte,
             0x3F20...0x3FFF => self.vram[address as usize] = byte, // FIXME
-            _ => panic!("Unimplemented PPU address: {:X}", address),
+            0x4000...0xFFFF => self.write_memory(address % 0x4000, byte),
         }
     }
 
