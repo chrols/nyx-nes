@@ -4,12 +4,10 @@ use super::cpu::Cpu;
 use super::ppu::Ppu;
 use super::ppu;
 
-use std::time::Duration;
 use std::time::Instant;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::keyboard::Scancode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
@@ -40,14 +38,14 @@ fn render(canvas: &mut Canvas<Window>, ppu: &Ppu) {
     let bg_color = Color::RGB(0, 0, 0);
 
     //println!("Color frame");
-    
+
     canvas.set_draw_color(bg_color);
     canvas.clear();
 
     for y in 0..(DISP_HEIGHT as usize) {
         for x in 0..(DISP_WIDTH as usize) {
             let fg_color = ppu.canvas[y * DISP_WIDTH as usize + x];
-            canvas.set_draw_color(convert_color(fg_color));                
+            canvas.set_draw_color(convert_color(fg_color));
             canvas.fill_rect(Rect::new(
                 (x * BLOCK_W) as i32,
                 (y * BLOCK_H) as i32,
@@ -76,9 +74,8 @@ pub fn execute(cpu: &mut Cpu) {
     canvas.clear();
     canvas.present();
 
-    
-    let mut tick = Instant::now();
 
+    //let tick = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
         for event in event_pump.poll_iter() {

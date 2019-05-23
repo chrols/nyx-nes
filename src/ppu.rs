@@ -103,10 +103,15 @@ impl Ppu {
         }
     }
 
-    pub fn read(&self, address: u16) -> u8 {
+    pub fn read(&mut self, address: u16) -> u8 {
         println!("PPUWREAD: {:X}", address);
         match address % 8 {
             2 => self.read_status(),
+            7 => {
+                let m = self.read_memory(self.address);
+                self.address = self.address.wrapping_add(1);
+                m
+            }
             _ => panic!("Unimplemented register: {:X}", address % 8),
         }
     }
@@ -202,7 +207,7 @@ impl Ppu {
     fn fetch_attribute_table(&mut self) -> u8 {
         // assert!(self.address >= 0x2000 && self.address < 0x3000);
 
-        let address = (self.address / 0x50) * 8 + (self.address / 4);
+        //let address = (self.address / 0x50) * 8 + (self.address / 4);
         // assert!(address >= 0x2000 && address < 0x3000);
 
         self.vram[self.address as usize]
@@ -210,7 +215,7 @@ impl Ppu {
 
 
     fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Color {
-        let mut tile_addr = ((oam.index as u16) << 4);
+        let mut tile_addr = (oam.index as u16) << 4;
 
         if self.sprite_offset {
             tile_addr += 0x1000;
@@ -300,7 +305,7 @@ impl Ppu {
         let y = (self.scanline - 1) as u16;
 
 
-        let sprite_addr = ((x / 8) * 16 + (y / 8) *  32 * 16 + (y % 8));
+        let sprite_addr = (x / 8) * 16 + (y / 8) *  32 * 16 + (y % 8);
 
         let low_byte = self.read_memory(sprite_addr);
         let high_byte = self.read_memory(sprite_addr + 8);
