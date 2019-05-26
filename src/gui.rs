@@ -97,7 +97,8 @@ pub fn execute(cpu: &mut Cpu) {
                         Keycode::Right => cpu.gamepad.right = true,
                         Keycode::Up => cpu.gamepad.up = true,
                         Keycode::Down => cpu.gamepad.down = true,
-                        Keycode::Return => { println!("PRESS!"); cpu.gamepad.start = true },
+                        Keycode::Space => cpu.gamepad.select = true,
+                        Keycode::Return => cpu.gamepad.start = true,
                         Keycode::Z => cpu.gamepad.a = true,
                         Keycode::V => cpu.gamepad.b = true,
 
@@ -112,6 +113,7 @@ pub fn execute(cpu: &mut Cpu) {
                         Keycode::Right => cpu.gamepad.right = false,
                         Keycode::Up => cpu.gamepad.up = false,
                         Keycode::Down => cpu.gamepad.down = false,
+                        Keycode::Space => cpu.gamepad.select = false,
                         Keycode::Return => cpu.gamepad.start = false,
                         Keycode::Z => cpu.gamepad.a = false,
                         Keycode::V => cpu.gamepad.b = false,

@@ -3,6 +3,7 @@ mod ines;
 mod ppu;
 mod gui;
 mod gamepad;
+mod kevtris;
 use std::env;
 
 fn sprite(chr_data: &[u8]) -> Vec<u8> {

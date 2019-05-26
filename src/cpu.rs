@@ -1,8 +1,9 @@
 use std::fmt;
-use super::ines;
-use super::ppu::Ppu;
-use super::gamepad::Gamepad;
 use std::panic;
+use super::gamepad::Gamepad;
+use super::ines;
+use super::kevtris;
+use super::ppu::Ppu;
 
 pub struct Cpu {
     a: u8,
@@ -695,14 +696,18 @@ impl Cpu {
         low_byte as u16 | (high_byte as u16) << 8
     }
 
-    // FIXME Explain bug
+    // Due to a hardware bug some reads will not correctly increment
+    // the high byte for the next byte
+
+    // I.e reading a word from $10FF will result in in reading $10FF
+    // and $1000, NOT $10FF and $1100.
     fn read_word_bug(&mut self, address: u16) -> u16 {
-        let b = (address & 0xFF00) | ((address as u8).wrapping_add(1)) as u16;
+        let b = (address & 0xFF00) | (address.wrapping_add(1) & 0x00FF);
         let low_byte = self.memory_read(address);
         let high_byte = self.memory_read(b);
         low_byte as u16 | (high_byte as u16) << 8
     }
-
+// 	val = PEEK(PEEK((arg + X) % 256) + PEEK((arg + X + 1) % 256) * 256)
 
     fn memory_write(&mut self, address: u16, byte: u8) {
         match address {
@@ -755,7 +760,10 @@ impl Cpu {
     fn pop_byte(&mut self) -> u8 {
         self.sp += 1;
         if self.headless && self.sp == 0xff {
-            println!("{:X} {:X}", self.memory_read(0x02), self.memory_read(0x03));
+            let fail1 = self.memory_read(0x02);
+            let fail2 = self.memory_read(0x03);
+            println!("0x02 = 0x{:02X} ({})", fail1, kevtris::translate_02(fail1));
+            println!("0x03 = 0x{:02X} ({})", fail2, kevtris::translate_03(fail2));
             ::std::process::exit(0);
         }
         self.memory_read(self.sp as u16 | 0x100)
@@ -775,15 +783,14 @@ impl Cpu {
 
         let decoded_address = self.decode_address(&fluff.mode);
 
-        //self.print_state(&fluff);
+        if self.headless {
+            self.print_state(&fluff);
+       }
 
         let step = Step {
             address: decoded_address,
             mode: fluff.mode,
         };
-
-
-
 
         self.pc += fluff.bytes as u16;
         let exec = fluff.function;
@@ -836,8 +843,10 @@ impl Cpu {
                 self.read_word_bug(m).wrapping_add(self.y as u16)
             }
             AddressingMode::IndexedIndirect =>  {
-                let m = self.memory_read(self.pc.wrapping_add(1)) as u16;
-                self.read_word_bug(m).wrapping_add(self.x as u16)
+                let m = self.memory_read(self.pc.wrapping_add(1));
+                let a = m.wrapping_add(self.x) as u16;
+
+                self.read_word_bug(a)
             }
         }
     }
@@ -2931,5 +2940,36 @@ mod tests {
         assert_eq!(cpu.a, 0x80);
         assert_eq!(cpu.c, true);
         assert_eq!(cpu.n, true);
+    }
+
+    #[test]
+    fn read_word_bug() {
+        let mut cpu = Cpu::new();
+        cpu.memory_write(0x10FF, 0xBE);
+        cpu.memory_write(0x1100, 0xAD);
+        cpu.memory_write(0x1000, 0xEF);
+
+        let m = cpu.read_word_bug(0x10FF);
+        assert_eq!(m, 0xEFBE);
+    }
+
+    #[test]
+    fn indexed_indirect_read() {
+        let mut cpu = Cpu::new();
+        cpu.pc = 1000;
+        cpu.memory_write(1001, 0xFF);
+        cpu.a = 0x5D;
+        cpu.x = 0x81;
+        cpu.memory_write(0x80, 0x00);
+        cpu.memory_write(0x81, 0x10);
+        cpu.memory_write(0x1000, 0x5A);
+
+        let mut step = Step::new();
+        step.mode = AddressingMode::IndexedIndirect;
+        step.address = cpu.decode_address(&step.mode);
+        assert_eq!(step.address, 0x1000);
+
+        cpu.lda(&step);
+        assert_eq!(cpu.a, 0x5A);
     }
 }
