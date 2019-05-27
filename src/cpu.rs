@@ -402,14 +402,16 @@ impl Cpu {
             self.set_zn(self.a);
         } else {
             let mut m = self.memory_read(step.address);
+
             let nc = (m & 0x01) != 0;
             m >>= 1;
             if self.c {
                 m |= 0x80;
             }
+
             self.memory_write(step.address, m);
             self.c = nc;
-            self.set_zn(self.a);
+            self.set_zn(m);
         }
     }
 
@@ -758,7 +760,7 @@ impl Cpu {
     }
 
     fn pop_byte(&mut self) -> u8 {
-        self.sp += 1;
+        self.sp = self.sp.wrapping_add(1);
         if self.headless && self.sp == 0xff {
             let fail1 = self.memory_read(0x02);
             let fail2 = self.memory_read(0x03);
@@ -783,14 +785,15 @@ impl Cpu {
 
         let decoded_address = self.decode_address(&fluff.mode);
 
-        if self.headless {
-            self.print_state(&fluff);
-       }
+
+        //self.print_state(&fluff);
+
 
         let step = Step {
             address: decoded_address,
             mode: fluff.mode,
         };
+
 
         self.pc += fluff.bytes as u16;
         let exec = fluff.function;
@@ -1738,7 +1741,7 @@ impl Cpu {
             126 => Operation {
                 function: Cpu::ror,
                 instruction: Instruction::ROR,
-                mode: AddressingMode::ZeroPage,
+                mode: AddressingMode::AbsoluteX,
                 bytes: 3,
                 cycles: 7,
             },
@@ -2927,7 +2930,7 @@ mod tests {
     }
 
     #[test]
-    fn ror() {
+    fn ror_accumulator() {
         let mut cpu = Cpu::new();
         let mut step = Step::new();
         step.mode = AddressingMode::Accumulator;
@@ -2938,6 +2941,32 @@ mod tests {
         cpu.ror(&step);
 
         assert_eq!(cpu.a, 0x80);
+        assert_eq!(cpu.c, true);
+        assert_eq!(cpu.n, true);
+    }
+
+    #[test]
+    fn ror_memory() {
+        let mut cpu = Cpu::new();
+        cpu.pc = 1000;
+        cpu.x = 0x55;
+        cpu.c = true;
+
+        cpu.memory_write(1001, 0x00);
+        cpu.memory_write(1002, 0x06);
+
+        let mut step = Step::new();
+        step.mode = AddressingMode::AbsoluteX;
+        step.address = cpu.decode_address(&step.mode);
+        assert_eq!(step.address, 0x0655);
+
+        cpu.a = 0x01;
+        cpu.sta(&step);
+        assert_eq!(cpu.memory_read(0x0655), 0x01);
+
+        cpu.ror(&step);
+
+        assert_eq!(cpu.memory_read(0x0655), 0x80);
         assert_eq!(cpu.c, true);
         assert_eq!(cpu.n, true);
     }
@@ -2972,4 +3001,5 @@ mod tests {
         cpu.lda(&step);
         assert_eq!(cpu.a, 0x5A);
     }
+
 }
