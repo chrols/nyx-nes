@@ -1,7 +1,7 @@
 //! http://wiki.nesdev.com/w/index.php/PPU_rendering
 
-use std::cell::Cell;
 use super::ines;
+use std::cell::Cell;
 use std::panic;
 
 /// The PPU renders 262 scanlines per frame.
@@ -35,14 +35,92 @@ pub struct OamData {
     left: u8,
 }
 
+fn palette(byte: u8) -> Color {
+    match byte {
+        0 => Color::RGB(84, 84, 84),
+        1 => Color::RGB(0, 30, 116),
+        2 => Color::RGB(8, 16, 144),
+        3 => Color::RGB(48, 0, 136),
+        4 => Color::RGB(68, 0, 100),
+        5 => Color::RGB(92, 0, 48),
+        6 => Color::RGB(84, 4, 0),
+        7 => Color::RGB(60, 24, 0),
+        8 => Color::RGB(32, 42, 0),
+        9 => Color::RGB(8, 58, 0),
+        10 => Color::RGB(0, 64, 0),
+        11 => Color::RGB(0, 60, 0),
+        12 => Color::RGB(0, 50, 60),
+        13 => Color::RGB(0, 0, 0),
+        14 => Color::RGB(0, 0, 0),
+        15 => Color::RGB(0, 0, 0),
+        16 => Color::RGB(152, 150, 152),
+        17 => Color::RGB(8, 76, 196),
+        18 => Color::RGB(48, 50, 236),
+        19 => Color::RGB(92, 30, 228),
+        20 => Color::RGB(136, 20, 176),
+        21 => Color::RGB(160, 20, 100),
+        22 => Color::RGB(152, 34, 32),
+        23 => Color::RGB(120, 60, 0),
+        24 => Color::RGB(84, 90, 0),
+        25 => Color::RGB(40, 114, 0),
+        26 => Color::RGB(8, 124, 0),
+        27 => Color::RGB(0, 118, 40),
+        28 => Color::RGB(0, 102, 120),
+        29 => Color::RGB(0, 0, 0),
+        30 => Color::RGB(0, 0, 0),
+        31 => Color::RGB(0, 0, 0),
+        32 => Color::RGB(236, 238, 236),
+        33 => Color::RGB(76, 154, 236),
+        34 => Color::RGB(120, 124, 236),
+        35 => Color::RGB(176, 98, 236),
+        36 => Color::RGB(228, 84, 236),
+        37 => Color::RGB(236, 88, 180),
+        38 => Color::RGB(236, 106, 100),
+        39 => Color::RGB(212, 136, 32),
+        40 => Color::RGB(160, 170, 0),
+        41 => Color::RGB(116, 196, 0),
+        42 => Color::RGB(76, 208, 32),
+        43 => Color::RGB(56, 204, 108),
+        44 => Color::RGB(56, 180, 204),
+        45 => Color::RGB(60, 60, 60),
+        46 => Color::RGB(0, 0, 0),
+        47 => Color::RGB(0, 0, 0),
+        48 => Color::RGB(236, 238, 236),
+        49 => Color::RGB(168, 204, 236),
+        50 => Color::RGB(188, 188, 236),
+        51 => Color::RGB(212, 178, 236),
+        52 => Color::RGB(236, 174, 236),
+        53 => Color::RGB(236, 174, 212),
+        54 => Color::RGB(236, 180, 176),
+        55 => Color::RGB(228, 196, 144),
+        56 => Color::RGB(204, 210, 120),
+        57 => Color::RGB(180, 222, 120),
+        58 => Color::RGB(168, 226, 144),
+        59 => Color::RGB(152, 226, 180),
+        60 => Color::RGB(160, 214, 228),
+        61 => Color::RGB(160, 162, 160),
+        62 => Color::RGB(0, 0, 0),
+        63 => Color::RGB(0, 0, 0),
+        _ => {
+            println!("Illegal palette: {:X}", byte);
+            Color::RGB(0,0,0)
+        }
+    }
+}
+
 impl OamData {
-    fn new()  -> OamData {
-        OamData {top:0,index:0,attr:0,left:0}
+    fn new() -> OamData {
+        OamData {
+            top: 0,
+            index: 0,
+            attr: 0,
+            left: 0,
+        }
     }
 
     fn contains(&self, x: u8, y: u8) -> bool {
-        let x_hit = x >= self.left && x < (self.left + 8);
-        let y_hit = y >= self.top && y < (self.top + 8);
+        let x_hit = x >= self.left && x < (self.left.saturating_add(8));
+        let y_hit = y >= self.top && y < (self.top.saturating_add(8));
         x_hit && y_hit
     }
 }
@@ -121,7 +199,10 @@ impl Ppu {
         match address % 8 {
             0 => self.write_ppuctrl(byte),
             1 => self.write_ppumask(byte),
-            3 => {println!("OAMADDR: {:X}", byte); self.oam_addr = byte},
+            3 => {
+                println!("OAMADDR: {:X}", byte);
+                self.oam_addr = byte
+            }
             4 => self.write_oamdata(byte),
             5 => self.write_scroll(byte),
             6 => self.write_address(byte),
@@ -157,8 +238,6 @@ impl Ppu {
             self.scanline += 1;
             self.scanline %= SCANLINES_PER_FRAME;
         }
-
-
     }
 
     /// Render a visible scanline
@@ -172,7 +251,6 @@ impl Ppu {
             _ => (),
         }
     }
-
 
     fn read_tile_address(&self) -> u16 {
         let mut addr = 0x10 * self.nametable as u16;
@@ -213,8 +291,7 @@ impl Ppu {
         self.vram[self.address as usize]
     }
 
-
-    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Color {
+    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
         let mut tile_addr = (oam.index as u16) << 4;
 
         if self.sprite_offset {
@@ -224,20 +301,22 @@ impl Ppu {
         let x_offset = x - oam.left;
         let y_offset = y - oam.top;
 
-        let low_byte = self.read_memory(tile_addr  + y_offset as u16 );
-        let high_byte = self.read_memory(tile_addr + y_offset as u16  + 8);
+        let low_byte = self.read_memory(tile_addr + y_offset as u16);
+        let high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
 
-        let pixel = ((low_byte >> (x_offset as u8)) & 0x01) + 2 * ((high_byte >> (x_offset as u8)) & 0x01);
+        //let pixel = ((low_byte >> (x_offset as u8)) & 0x01) + 2 * ((high_byte >> (x_offset as u8)) & 0x01);
+        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x % 8));
 
-        match pixel {
-            0 => Color::RGB(0,0,0),
-            1 => Color::RGB(255,0,0),
-            2 => Color::RGB(0,255,0),
-            3 => Color::RGB(0,0,255),
-            _ => panic!("Invalid result: {:X}", low_byte + high_byte),
+        if pixel == 0 {
+            return None;
         }
-    }
 
+        assert!(pixel < 4);
+
+        let palette_addr = (oam.attr as u16 & 0x3) * 4 + 0x3F10;
+        let color = palette(self.read_memory(palette_addr + pixel as u16));
+        Some(color)
+    }
 
     pub fn dump_memory(&mut self, addr: u16, blocks: usize) {
         let mut addr = addr;
@@ -267,45 +346,42 @@ impl Ppu {
         for i in 0..64 {
             print!("{:04X}:", addr);
             for j in 0..4 {
-                print!(" {:02X}", self.oam[i*4+j]);
+                print!(" {:02X}", self.oam[i * 4 + j]);
                 addr += 1;
             }
             println!("");
         }
     }
 
-
     fn read_oam(&self, oam_addr: usize) -> OamData {
         OamData {
             top: self.oam[oam_addr],
-            index: self.oam[oam_addr+1],
-            attr: self.oam[oam_addr+2],
-            left: self.oam[oam_addr+3],
+            index: self.oam[oam_addr + 1],
+            attr: self.oam[oam_addr + 2],
+            left: self.oam[oam_addr + 3],
         }
     }
 
-    fn sprite_pixel(&mut self) -> Color {
+    fn sprite_pixel(&mut self) -> Option<Color> {
         let x = (self.current_cycle - 1) as u8;
         let y = (self.scanline - 1) as u8;
 
         for i in 0..64 {
-            let oam = self.read_oam(i*4);
+            let oam = self.read_oam(i * 4);
             if oam.contains(x, y) {
                 // println!("Sprite color: {:?}", self.sprite_color(x, y, i % 4));
                 return self.sprite_color(x, y, oam);
             }
         }
 
-        Color::RGB(0,0,0)
+        None
     }
-
 
     fn chr_pixel(&mut self) -> Color {
         let x = (self.current_cycle - 1) as u16;
         let y = (self.scanline - 1) as u16;
 
-
-        let sprite_addr = (x / 8) * 16 + (y / 8) *  32 * 16 + (y % 8);
+        let sprite_addr = (x / 8) * 16 + (y / 8) * 32 * 16 + (y % 8);
 
         let low_byte = self.read_memory(sprite_addr);
         let high_byte = self.read_memory(sprite_addr + 8);
@@ -313,52 +389,76 @@ impl Ppu {
         let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x % 8) as u8);
 
         match pixel {
-            0 => Color::RGB(0,0,0),
-            1 => Color::RGB(255,0,0),
-            2 => Color::RGB(0,255,0),
-            3 => Color::RGB(0,0,255),
+            0 => Color::RGB(0, 0, 0),
+            1 => Color::RGB(255, 0, 0),
+            2 => Color::RGB(0, 255, 0),
+            3 => Color::RGB(0, 0, 255),
             _ => panic!("Invalid result: {:X}", low_byte + high_byte),
         }
     }
-
 
     fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
         let x_offset = 7 - x;
         ((low >> x_offset) & 0x01) + 2 * ((high >> x_offset) & 0x01)
     }
 
-    fn bg_pixel(&mut self) -> Color {
+    fn bg_pixel(&mut self) -> Option<Color> {
         let x = (self.current_cycle - 1) as u16;
         let y = (self.scanline - 1) as u16;
-
 
         let index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
         let index = self.read_memory(index_addr);
         let tile_addr = (index as u16) << 4;
         // println!("Tile addr {:X}", tile_addr);
 
-        self.tile_high = self.read_memory(tile_addr+ (y % 8) + 8);
+        self.tile_high = self.read_memory(tile_addr + (y % 8) + 8);
         self.tile_low = self.read_memory(tile_addr + (y % 8));
 
         // println!("{:X} {:X}", self.tile_high, self.tile_low);
         let color = Ppu::bytes_to_pixel(self.tile_high, self.tile_low, (x % 8) as u8);
 
-        match color {
-            0 => Color::RGB(0,0,0),
-            1 => Color::RGB(255,0,0),
-            2 => Color::RGB(0,255,0),
-            3 => Color::RGB(0,0,255),
-            _ => panic!("Invalid result: {:X}", color),
+        if color == 0 {
+            return None;
         }
+
+        assert!(color < 4);
+
+        let attr_byte = (y / 32) * 8 + (x / 32) + 0x23C0;
+
+        let ix = (x % 32);
+        let iy = (y % 32);
+
+        let attr = if ix >= 16 && iy >= 16 { // Lower right
+            (attr_byte >> 6) & 0x3
+        } else if iy >= 16 { // Upper right
+            (attr_byte >> 4) & 0x3
+        } else if ix >= 16 { // Lower left
+            (attr_byte >> 2) & 0x3
+        } else { // Upper left
+            attr_byte & 0x3
+        };
+
+        let palette_addr = (attr as u16 * 4) + 0x3F00 + color as u16;
+        Some(palette(self.read_memory(palette_addr)))
+    }
+
+    fn universal_bg(&mut self) -> Color {
+        palette(self.read_memory(0x3F00))
     }
 
     fn render_pixel(&mut self) {
         let x = self.current_cycle - 1;
         let y = self.scanline - 1;
 
+        self.canvas[(y * 256 + x) as usize] =
+            if let Some(sprite_pixel) = self.sprite_pixel() {
+                sprite_pixel
+        } else if let Some(bg_pixel) = self.bg_pixel() {
+                bg_pixel
+        } else {
+                self.universal_bg()
+        }
 
-        //self.canvas[(y * 256 + x) as usize] = self.sprite_pixel();
-        self.canvas[(y * 256 + x) as usize] = self.bg_pixel();
         //self.canvas[(y * 256 + x) as usize] = self.chr_pixel();
     }
 
@@ -449,9 +549,7 @@ impl Ppu {
     fn read_memory(&mut self, address: u16) -> u8 {
         match address {
             0x0000...0x1FFF => match &self.rom {
-                Some(game) => {
-                    game.chr_rom[address as usize]
-                },
+                Some(game) => game.chr_rom[address as usize],
                 None => panic!("No game loaded"),
             },
             0x2000...0x3FFF => self.vram[address as usize],
