@@ -82,6 +82,8 @@ pub fn execute(cpu: &mut Cpu) {
     //let tick = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
+
+        if cpu.cyc % 29829 == 0 {
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. }
@@ -103,8 +105,8 @@ pub fn execute(cpu: &mut Cpu) {
                         Keycode::Down => cpu.gamepad.down = true,
                         Keycode::Space => cpu.gamepad.select = true,
                         Keycode::Return => cpu.gamepad.start = true,
-                        Keycode::Z => cpu.gamepad.a = true,
-                        Keycode::V => cpu.gamepad.b = true,
+                        Keycode::J => cpu.gamepad.a = true,
+                        Keycode::Q => cpu.gamepad.b = true,
 
                         _ => (),
                     }
@@ -119,13 +121,14 @@ pub fn execute(cpu: &mut Cpu) {
                         Keycode::Down => cpu.gamepad.down = false,
                         Keycode::Space => cpu.gamepad.select = false,
                         Keycode::Return => cpu.gamepad.start = false,
-                        Keycode::Z => cpu.gamepad.a = false,
-                        Keycode::V => cpu.gamepad.b = false,
+                        Keycode::J => cpu.gamepad.a = false,
+                        Keycode::Q => cpu.gamepad.b = false,
                         _ => (),
                     }
                 }
                 _ => {}
             }
+        }
         }
 
 
