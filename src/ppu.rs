@@ -265,6 +265,19 @@ impl Ppu {
         }
     }
 
+    fn mirror_byte(byte: u8) -> u8 {
+        let mut mirror = 0;
+        if (byte & 0x01 != 0) { mirror |= 0x80; }
+        if (byte & 0x02 != 0) { mirror |= 0x40; }
+        if (byte & 0x04 != 0) { mirror |= 0x20; }
+        if (byte & 0x08 != 0) { mirror |= 0x10; }
+        if (byte & 0x10 != 0) { mirror |= 0x08; }
+        if (byte & 0x20 != 0) { mirror |= 0x04; }
+        if (byte & 0x40 != 0) { mirror |= 0x02; }
+        if (byte & 0x80 != 0) { mirror |= 0x01; }
+        mirror
+    }
+
     fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
         let mut tile_addr = (oam.index as u16) << 4;
 
@@ -272,13 +285,26 @@ impl Ppu {
             tile_addr += 0x1000;
         }
 
-        let y_offset = y - oam.top;
+        let horizontal_mirror =  oam.attr & 0x80 != 0;
 
-        let low_byte = self.read_memory(tile_addr + y_offset as u16);
-        let high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
+        let y_offset = if horizontal_mirror {
+            7 - y - oam.top
+        } else {
+            y - oam.top
+        };
 
-        //let pixel = ((low_byte >> (x_offset as u8)) & 0x01) + 2 * ((high_byte >> (x_offset as u8)) & 0x01);
-        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, x % 8);
+
+        let mut low_byte = self.read_memory(tile_addr + y_offset as u16);
+        let mut high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
+
+        let vertical_mirror = oam.attr & 0x40 != 0;
+
+        if vertical_mirror {
+            low_byte = Ppu::mirror_byte(low_byte);
+            high_byte = Ppu::mirror_byte(high_byte);
+        }
+
+        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x - oam.left));
 
         if pixel == 0 {
             return None;
@@ -342,7 +368,6 @@ impl Ppu {
         for i in 0..64 {
             let oam = self.read_oam(i * 4);
             if oam.contains(x, y) {
-                // println!("Sprite color: {:?}", self.sprite_color(x, y, i % 4));
                 return self.sprite_color(x, y, oam);
             }
         }
@@ -382,20 +407,17 @@ impl Ppu {
         let x = (self.current_cycle - 1) as u16;
         let y = (self.scanline - 1) as u16;
 
-        let mut index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
-
-        if self.bg_pattern_offset {
-            index_addr += 0x1000
-        }
+        let index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
 
         let index = self.read_memory(index_addr);
-        let tile_addr = (index as u16) << 4;
-        // println!("Tile addr {:X}", tile_addr);
+        let mut tile_addr = (index as u16) << 4;
+        if self.bg_pattern_offset {
+            tile_addr += 0x1000
+        }
 
         self.tile_high = self.read_memory(tile_addr + (y % 8) + 8);
         self.tile_low = self.read_memory(tile_addr + (y % 8));
 
-        // println!("{:X} {:X}", self.tile_high, self.tile_low);
         let color = Ppu::bytes_to_pixel(self.tile_high, self.tile_low, (x % 8) as u8);
 
         if color == 0 {
@@ -447,10 +469,8 @@ impl Ppu {
     ///            vertical blanking interval (0: off; 1: on)
     fn write_ppuctrl(&mut self, byte: u8) {
         self.nmi = (0x80 & byte) != 0;
-        //self.slave = (0x40 & byte) != 0;
-        // FIXME
-
-        self.sprite_offset = (0x04 & byte) != 0;
+        self.bg_pattern_offset = (0x10 & byte) != 0;
+        self.sprite_offset = (0x08 & byte) != 0;
     }
 
     /// 7  bit  0
@@ -576,4 +596,5 @@ mod tests {
         ppu.write_address(0x10);
         assert_eq!(0x2010, ppu.address);
     }
+
 }
