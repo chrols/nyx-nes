@@ -34,26 +34,30 @@ fn convert_color(color: ppu::Color) -> Color {
     Color::from((color.r, color.g, color.b))
 }
 
-fn render(canvas: &mut Canvas<Window>, ppu: &Ppu) {
+fn render(canvas: &mut Canvas<Window>, ppu: &mut Ppu) {
     let bg_color = Color::RGB(0, 0, 0);
 
     //println!("Color frame");
 
     canvas.set_draw_color(bg_color);
-    canvas.clear();
+    //canvas.clear();
 
     for y in 0..(DISP_HEIGHT as usize) {
         for x in 0..(DISP_WIDTH as usize) {
-            let fg_color = ppu.canvas[y * DISP_WIDTH as usize + x];
-            canvas.set_draw_color(convert_color(fg_color));
-            canvas.fill_rect(Rect::new(
-                (x * BLOCK_W) as i32,
-                (y * BLOCK_H) as i32,
-                BLOCK_W as u32,
-                BLOCK_H as u32,
-            ));
+            let index = y * DISP_WIDTH as usize + x;
+            if ppu.canvas[index] != ppu.prev_canvas[index] {
+                let fg_color = ppu.canvas[index];
+                canvas.set_draw_color(convert_color(fg_color));
+                canvas.fill_rect(Rect::new(
+                    (x * BLOCK_W) as i32,
+                    (y * BLOCK_H) as i32,
+                    BLOCK_W as u32,
+                    BLOCK_H as u32,
+                ));
+            }
         }
     }
+    ppu.prev_canvas = ppu.canvas.clone();
     canvas.present();
 }
 
@@ -126,7 +130,7 @@ pub fn execute(cpu: &mut Cpu) {
 
 
         if cpu.ppu.updated {
-            render(&mut canvas, &cpu.ppu);
+            render(&mut canvas, &mut cpu.ppu);
             cpu.ppu.updated = false;
         }
 

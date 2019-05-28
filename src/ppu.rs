@@ -10,7 +10,7 @@ const SCANLINES_PER_FRAME: usize = 262;
 /// Each scanline lasts for 341 PPU clock cycles
 const CYCLES_PER_SCANLINE: usize = 341;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -140,6 +140,7 @@ pub struct Ppu {
     scroll_x: u8,
     scroll_y: u8,
     pub canvas: [Color; 256 * 240],
+    pub prev_canvas: [Color; 256 * 240],
     pub updated: bool,
     nmi: bool,
     current_cycle: usize,
@@ -167,6 +168,7 @@ impl Ppu {
             scroll_x: 0,
             scroll_y: 0,
             canvas: [Color::new(); 256 * 240],
+            prev_canvas: [Color::RGB(255,255,255); 256 * 240],
             updated: false,
             nmi: false,
             scanline: 0,
@@ -684,6 +686,7 @@ impl Ppu {
         self.vblank.set(true);
         self.updated = true;
     }
+
 }
 
 // Cycles 1-256
