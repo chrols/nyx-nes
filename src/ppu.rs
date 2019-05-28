@@ -254,17 +254,6 @@ impl Ppu {
         }
     }
 
-    fn read_tile_address(&self) -> u16 {
-        let mut addr = 0x10 * self.nametable as u16;
-        addr += (self.scanline as u16 - 1) % 8;
-
-        if self.bg_pattern_offset {
-            addr += 0x1000
-        }
-
-        addr
-    }
-
     fn visible_scanline_render_cycle(&mut self) {
         self.render_pixel();
 
@@ -280,19 +269,6 @@ impl Ppu {
         }
     }
 
-    /// Attribute tables are 64-bytes per nametable.
-    /// Each byte controls 4x4 tiles. 2-bits per 2x2 tiles.
-    ///
-    /// Tables start at: $23C0, $27C0, $2BC0, or $2FC0,
-    fn fetch_attribute_table(&mut self) -> u8 {
-        // assert!(self.address >= 0x2000 && self.address < 0x3000);
-
-        //let address = (self.address / 0x50) * 8 + (self.address / 4);
-        // assert!(address >= 0x2000 && address < 0x3000);
-
-        self.vram[self.address as usize]
-    }
-
     fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
         let mut tile_addr = (oam.index as u16) << 4;
 
@@ -300,14 +276,13 @@ impl Ppu {
             tile_addr += 0x1000;
         }
 
-        let x_offset = x - oam.left;
         let y_offset = y - oam.top;
 
         let low_byte = self.read_memory(tile_addr + y_offset as u16);
         let high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
 
         //let pixel = ((low_byte >> (x_offset as u8)) & 0x01) + 2 * ((high_byte >> (x_offset as u8)) & 0x01);
-        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x % 8));
+        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, x % 8);
 
         if pixel == 0 {
             return None;
@@ -322,9 +297,9 @@ impl Ppu {
 
     pub fn dump_memory(&mut self, addr: u16, blocks: usize) {
         let mut addr = addr;
-        for i in 0..blocks {
+        for _i in 0..blocks {
             print!("{:04X}:", addr);
-            for j in 0..16 {
+            for _j in 0..16 {
                 print!(" {:02X}", self.read_memory(addr));
                 addr += 1;
             }
@@ -464,12 +439,6 @@ impl Ppu {
         //self.canvas[(y * 256 + x) as usize] = self.chr_pixel();
     }
 
-    // Each attribute table, starting at $23C0, $27C0, $2BC0, or $2FC0, is arranged as an 8x8 byte array:
-    /// 7654 3210
-    /// |||| ||++- Color bits 3-2 for top left quadrant of this byte
-    /// |||| ++--- Color bits 3-2 for top right quadrant of this byte
-    /// ||++------ Color bits 3-2 for bottom left quadrant of this byte
-    /// ++-------- Color bits 3-2 for bottom right quadrant of this byte
 
     /// 7  bit  0
     /// ---- ----
@@ -570,67 +539,6 @@ impl Ppu {
         }
     }
 
-    fn convert_palette(palette: u8) -> Color {
-        match palette {
-            0 => Color::RGB(84, 84, 84),
-            1 => Color::RGB(0, 30, 116),
-            2 => Color::RGB(8, 16, 144),
-            3 => Color::RGB(48, 0, 136),
-            4 => Color::RGB(68, 0, 100),
-            5 => Color::RGB(92, 0, 48),
-            6 => Color::RGB(84, 4, 0),
-            7 => Color::RGB(60, 24, 0),
-            8 => Color::RGB(32, 42, 0),
-            9 => Color::RGB(8, 58, 0),
-            10 => Color::RGB(0, 64, 0),
-            11 => Color::RGB(0, 60, 0),
-            12 => Color::RGB(0, 50, 60),
-            13 => Color::RGB(0, 0, 0),
-            14 => Color::RGB(152, 150, 152),
-            15 => Color::RGB(8, 76, 196),
-            16 => Color::RGB(48, 50, 236),
-            17 => Color::RGB(92, 30, 228),
-            18 => Color::RGB(136, 20, 176),
-            19 => Color::RGB(160, 20, 100),
-            20 => Color::RGB(152, 34, 32),
-            21 => Color::RGB(120, 60, 0),
-            22 => Color::RGB(84, 90, 0),
-            23 => Color::RGB(40, 114, 0),
-            24 => Color::RGB(8, 124, 0),
-            25 => Color::RGB(0, 118, 40),
-            26 => Color::RGB(0, 102, 120),
-            27 => Color::RGB(0, 0, 0),
-            28 => Color::RGB(236, 238, 236),
-            29 => Color::RGB(76, 154, 236),
-            30 => Color::RGB(120, 124, 236),
-            31 => Color::RGB(176, 98, 236),
-            32 => Color::RGB(228, 84, 236),
-            33 => Color::RGB(236, 88, 180),
-            34 => Color::RGB(236, 106, 100),
-            35 => Color::RGB(212, 136, 32),
-            36 => Color::RGB(160, 170, 0),
-            37 => Color::RGB(116, 196, 0),
-            38 => Color::RGB(76, 208, 32),
-            39 => Color::RGB(56, 204, 108),
-            40 => Color::RGB(56, 180, 204),
-            41 => Color::RGB(60, 60, 60),
-            42 => Color::RGB(236, 238, 236),
-            43 => Color::RGB(168, 204, 236),
-            44 => Color::RGB(188, 188, 236),
-            45 => Color::RGB(212, 178, 236),
-            46 => Color::RGB(236, 174, 236),
-            47 => Color::RGB(236, 174, 212),
-            48 => Color::RGB(236, 180, 176),
-            49 => Color::RGB(228, 196, 144),
-            50 => Color::RGB(204, 210, 120),
-            51 => Color::RGB(180, 222, 120),
-            52 => Color::RGB(168, 226, 144),
-            53 => Color::RGB(152, 226, 180),
-            54 => Color::RGB(160, 214, 228),
-            55 => Color::RGB(160, 162, 160),
-            _ => panic!("Invalid palette {:X}", palette),
-        }
-    }
 
     /// 7  bit  0
     /// ---- ----
@@ -660,24 +568,6 @@ impl Ppu {
         byte
     }
 
-    pub fn render_scanline(&mut self) {}
-
-    fn read_nametable(&mut self) -> u8 {
-        0
-    }
-
-    fn read_attribute_table(&mut self) -> u8 {
-        0
-    }
-
-    fn read_low_tile(&mut self) -> u8 {
-        0
-    }
-
-    fn read_high_tile(&mut self) -> u8 {
-        0
-    }
-
     pub fn vblank(&mut self) {
         self.vblank.set(true);
     }
@@ -688,25 +578,6 @@ impl Ppu {
     }
 
 }
-
-// Cycles 1-256
-
-// The data for each tile is fetched during this phase. Each memory access takes 2 PPU cycles to complete, and 4 must be performed per tile:
-
-//     Nametable byte
-//     Attribute table byte
-//     Tile bitmap low
-//     Tile bitmap high (+8 bytes from tile bitmap low)
-
-// The data fetched from these accesses is placed into internal latches, and then fed to the appropriate shift registers when it's time to do so (every 8 cycles). Because the PPU can only fetch an attribute byte every 8 cycles, each sequential string of 8 pixels is forced to have the same palette attribute.
-
-// Sprite zero hits act as if the image starts at cycle 2 (which is the same cycle that the shifters shift for the first time), so the sprite zero flag will be raised at this point at the earliest. Actual pixel output is delayed further due to internal render pipelining, and the first pixel is output during cycle 4.
-
-// The shifters are reloaded during ticks 9, 17, 25, ..., 257.
-
-// Note: At the beginning of each scanline, the data for the first two tiles is already loaded into the shift registers (and ready to be rendered), so the first tile that gets fetched is Tile 3.
-
-// While all of this is going on, sprite evaluation for the next scanline is taking place as a seperate process, independent to what's happening here.
 
 #[cfg(test)]
 mod tests {
