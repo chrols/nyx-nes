@@ -354,36 +354,44 @@ impl Ppu {
         None
     }
 
-    fn chr_pixel(&mut self) -> Color {
-        let x = (self.current_cycle - 1) as u16;
-        let y = (self.scanline - 1) as u16;
-
-        let sprite_addr = (x / 8) * 16 + (y / 8) * 32 * 16 + (y % 8);
-
-        let low_byte = self.read_memory(sprite_addr);
-        let high_byte = self.read_memory(sprite_addr + 8);
-
-        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x % 8) as u8);
-
-        match pixel {
-            0 => Color::RGB(0, 0, 0),
-            1 => Color::RGB(255, 0, 0),
-            2 => Color::RGB(0, 255, 0),
-            3 => Color::RGB(0, 0, 255),
-            _ => panic!("Invalid result: {:X}", low_byte + high_byte),
-        }
-    }
-
     fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
         let x_offset = 7 - x;
         ((low >> x_offset) & 0x01) + 2 * ((high >> x_offset) & 0x01)
+    }
+
+    fn attribute_byte(&mut self, x: u16, y: u16) -> u8 {
+        self.read_memory((y / 32) * 8 + (x / 32) + 0x23C0)
+    }
+
+    fn bg_palette_addr_base(&mut self, x: u16, y: u16) -> u16 {
+        let attr_byte = self.attribute_byte(x, y);
+
+        let ix = x % 32;
+        let iy = y % 32;
+
+        let attr = if ix >= 16 && iy >= 16 { // Lower right
+            (attr_byte >> 6) & 0x3
+        } else if iy >= 16 { // Upper right
+            (attr_byte >> 4) & 0x3
+        } else if ix >= 16 { // Lower left
+            (attr_byte >> 2) & 0x3
+        } else { // Upper left
+            attr_byte & 0x3
+        };
+
+        (attr as u16 * 4) + 0x3F00
     }
 
     fn bg_pixel(&mut self) -> Option<Color> {
         let x = (self.current_cycle - 1) as u16;
         let y = (self.scanline - 1) as u16;
 
-        let index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
+        let mut index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
+
+        if self.bg_pattern_offset {
+            index_addr += 0x1000
+        }
+
         let index = self.read_memory(index_addr);
         let tile_addr = (index as u16) << 4;
         // println!("Tile addr {:X}", tile_addr);
@@ -400,22 +408,7 @@ impl Ppu {
 
         assert!(color < 4);
 
-        let attr_byte = (y / 32) * 8 + (x / 32) + 0x23C0;
-
-        let ix = (x % 32);
-        let iy = (y % 32);
-
-        let attr = if ix >= 16 && iy >= 16 { // Lower right
-            (attr_byte >> 6) & 0x3
-        } else if iy >= 16 { // Upper right
-            (attr_byte >> 4) & 0x3
-        } else if ix >= 16 { // Lower left
-            (attr_byte >> 2) & 0x3
-        } else { // Upper left
-            attr_byte & 0x3
-        };
-
-        let palette_addr = (attr as u16 * 4) + 0x3F00 + color as u16;
+        let palette_addr = self.bg_palette_addr_base(x, y) + color as u16;
         Some(palette(self.read_memory(palette_addr)))
     }
 
