@@ -56,7 +56,6 @@ impl Gamepad {
     }
 
     pub fn read(&self) -> u8 {
-        println!("GAMEPAD READ");
         if self.polling {
             1
         } else {

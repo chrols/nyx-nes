@@ -184,7 +184,6 @@ impl Ppu {
     }
 
     pub fn read(&mut self, address: u16) -> u8 {
-        println!("PPUWREAD: {:X}", address);
         match address % 8 {
             2 => self.read_status(),
             7 => {
@@ -197,12 +196,10 @@ impl Ppu {
     }
 
     pub fn write(&mut self, address: u16, byte: u8) {
-        println!("PPUWRITE: {:X} {:X}", address, byte);
         match address % 8 {
             0 => self.write_ppuctrl(byte),
             1 => self.write_ppumask(byte),
             3 => {
-                println!("OAMADDR: {:X}", byte);
                 self.oam_addr = byte
             }
             4 => self.write_oamdata(byte),
@@ -210,7 +207,6 @@ impl Ppu {
             6 => self.write_address(byte),
             7 => {
                 self.write_memory(self.address, byte);
-                println!("PPUWDATA: {:04X}", self.address);
                 self.address = self.address.wrapping_add(1);
             }
             _ => panic!("Unimplemented register: {:X}", address % 8),
@@ -474,13 +470,11 @@ impl Ppu {
     }
 
     fn write_oamdata(&mut self, byte: u8) {
-        println!("OAM {:X} = {:X}", self.oam_addr, byte);
         self.oam[self.oam_addr as usize] = byte;
         self.oam_addr = self.oam_addr.wrapping_add(1);
     }
 
     fn write_address(&mut self, byte: u8) {
-        println!("PPUADDR: {:X}", byte);
         if self.low_address {
             self.address |= byte as u16;
             self.low_address = false;
@@ -491,7 +485,6 @@ impl Ppu {
     }
 
     fn write_scroll(&mut self, byte: u8) {
-        println!("PPUSCROLL: {:X}", byte);
         if self.low_address {
             self.scroll_x = byte;
             self.low_address = false;
