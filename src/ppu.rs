@@ -151,6 +151,7 @@ pub struct Ppu {
     tile_low: u8,
     tile_high: u8,
     sprite_offset: bool,
+    base_namtable_addr: u8,
     pub rom: Option<ines::File>,
 }
 
@@ -179,6 +180,7 @@ impl Ppu {
             tile_low: 0,
             tile_high: 0,
             sprite_offset: false,
+            base_namtable_addr: 0,
             rom: None,
         }
     }
@@ -407,7 +409,7 @@ impl Ppu {
         let x = (self.current_cycle - 1) as u16;
         let y = (self.scanline - 1) as u16;
 
-        let index_addr = 0x2000 + (y / 8) * 32 + (x / 8);
+        let index_addr = 0x2000 + 0x400 * self.base_namtable_addr as u16 + (y / 8) * 32 + (x / 8);
 
         let index = self.read_memory(index_addr);
         let mut tile_addr = (index as u16) << 4;
@@ -471,6 +473,8 @@ impl Ppu {
         self.nmi = (0x80 & byte) != 0;
         self.bg_pattern_offset = (0x10 & byte) != 0;
         self.sprite_offset = (0x08 & byte) != 0;
+        self.base_namtable_addr = (0x03 & byte);
+
     }
 
     /// 7  bit  0
