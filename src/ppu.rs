@@ -295,7 +295,6 @@ impl Ppu {
             y - oam.top
         };
 
-
         let mut low_byte = self.read_memory(tile_addr + y_offset as u16);
         let mut high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
 
@@ -323,7 +322,7 @@ impl Ppu {
         let mut addr = addr;
         for _i in 0..blocks {
             print!("{:04X}:", addr);
-            for _j in 0..16 {
+            for _j in 0..32 {
                 print!(" {:02X}", self.read_memory(addr));
                 addr += 1;
             }
@@ -511,13 +510,7 @@ impl Ppu {
     }
 
     fn write_scroll(&mut self, byte: u8) {
-        if self.low_address {
-            self.scroll_x = byte;
-            self.low_address = false;
-        } else {
-            self.scroll_y = byte;
-            self.low_address = true;
-        }
+
     }
 
     /// $0000-$0FFF 	$1000 	Pattern table 0
