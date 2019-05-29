@@ -370,7 +370,9 @@ impl Ppu {
         for i in 0..64 {
             let oam = self.read_oam(i * 4);
             if oam.contains(x, y) {
-                return self.sprite_color(x, y, oam);
+                if let Some(color) = self.sprite_color(x, y, oam) {
+                    return Some(color);
+                }
             }
         }
 
