@@ -541,7 +541,7 @@ impl Ppu {
     }
 
     fn write_memory(&mut self, address: u16, byte: u8) {
-        match address % 0x4000 {
+        match address {
             0x0000...0x1FFF => println!("Write to rom ${:04X}!", address),
             0x2000...0x2FFF => self.vram[address as usize] = byte,
             0x3000...0x3EFF => self.vram[address as usize - 0x1000] = byte,
