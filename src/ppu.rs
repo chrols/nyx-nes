@@ -290,7 +290,7 @@ impl Ppu {
         let horizontal_mirror =  oam.attr & 0x80 != 0;
 
         let y_offset = if horizontal_mirror {
-            7 - y - oam.top
+            7 - (y - oam.top)
         } else {
             y - oam.top
         };
