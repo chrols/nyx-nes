@@ -95,6 +95,8 @@ pub fn execute(cpu: &mut Cpu) {
                     keycode: Some(kc), ..
                 } => {
                     match kc {
+                        Keycode::Num1 => cpu.headless = true,
+                        Keycode::Num2 => cpu.headless = false,
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
                         Keycode::O => cpu.ppu.dump_oam(),
                         Keycode::E => cpu.ppu.dump_nametables(),
@@ -138,14 +140,6 @@ pub fn execute(cpu: &mut Cpu) {
         }
 
         cpu.cycle();
-        cpu.ppu.cycle();
-        cpu.ppu.cycle();
-        cpu.ppu.cycle();
-
-        if cpu.cyc % 29829 == 0 {
-            cpu.ppu.vblank();
-            cpu.nmi();
-        }
 
         // if tick.elapsed() >= Duration::new(0, 1_000_000_000u32 / 10) {
         //     tick = Instant::now();

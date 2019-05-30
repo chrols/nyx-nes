@@ -30,11 +30,7 @@ fn main() {
         let filename = &args[1];
         let rom_file = ines::File::read(filename);
 
-        let copy = rom_file.clone();
-
-        cpu.rom = Some(rom_file);
-        cpu.ppu.rom = Some(copy);
-
+        cpu.load_game(rom_file);
         cpu.reset();
         gui::execute(&mut cpu);
     } else {

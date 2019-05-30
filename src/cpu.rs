@@ -18,8 +18,8 @@ pub struct Cpu {
     d: bool, // Decimal mode flag
     v: bool, // Overflow flag
     n: bool, // Negative flag
-    headless: bool, // Headless testing mode
-    pub rom: Option<ines::File>,
+    pub headless: bool, // Headless testing mode
+    rom: Option<ines::File>,
     pub ppu: Ppu,
     pub cyc: u64,
     pub gamepad: Gamepad,
@@ -184,7 +184,7 @@ impl Cpu {
         let nestest = ines::File::read("rom/nestest.nes");
         let mut cpu = Cpu::new();
         cpu.headless = true;
-        cpu.rom = Some(nestest);
+        cpu.load_game(nestest);
         cpu.reset();
         cpu.pc = 0xC000;
 
@@ -197,6 +197,12 @@ impl Cpu {
     pub fn reset(&mut self) {
         self.pc = self.read_word(0xfffc);
         // self.pc = 0xC000;
+    }
+
+    pub fn load_game(&mut self, file: ines::File) {
+        let clone = file.clone();
+        self.rom = Some(file);
+        self.ppu.rom = Some(clone);
     }
 
     fn adc(&mut self, step: &Step) {
@@ -661,7 +667,7 @@ impl Cpu {
         panic!("Halt and catch fire!");
     }
 
-    pub fn nmi(&mut self) {
+    fn nmi(&mut self) {
         println!("NMI!");
 
         self.push_word(self.pc);
@@ -785,9 +791,9 @@ impl Cpu {
 
         let decoded_address = self.decode_address(&fluff.mode);
 
-
-        //self.print_state(&fluff);
-
+        if self.headless {
+            self.print_state(&fluff);
+        }
 
         let step = Step {
             address: decoded_address,
@@ -799,7 +805,17 @@ impl Cpu {
         let exec = fluff.function;
 
         exec(self, &step);
-        self.cyc += 1;
+        self.cyc += fluff.cycles as u64;
+
+        for _ in 0..fluff.cycles*3 {
+            self.ppu.cycle();
+        }
+
+        if self.ppu.cpu_nmi {
+            self.ppu.cpu_nmi = false;
+            self.nmi();
+
+        }
     }
 
     fn print_state(&mut self, op: &Operation) {
@@ -809,7 +825,7 @@ impl Cpu {
             op_bytes = op_bytes + &format!("{:02X} ", self.memory_read(self.pc + i as u16));
         }
 
-        println!("{:04X}  {:<9} {:<31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} PPU:???,??? CYC:{}", self.pc, op_bytes, format!("{:?}", op.instruction), self.a, self.x, self.y, self.get_flags(), self.sp, self.cyc);
+        println!("{:04X}  {:<9} {:<31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} PPU:{:3},{:3} CYC:{}", self.pc, op_bytes, format!("{:?}", op.instruction), self.a, self.x, self.y, self.get_flags(), self.sp, self.ppu.current_cycle, self.ppu.scanline, self.cyc);
     }
 
 

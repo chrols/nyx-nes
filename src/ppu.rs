@@ -142,9 +142,9 @@ pub struct Ppu {
     pub canvas: [Color; 256 * 240],
     pub prev_canvas: [Color; 256 * 240],
     pub updated: bool,
-    nmi: bool,
-    current_cycle: usize,
-    scanline: usize,
+    generate_nmi: bool,
+    pub current_cycle: usize,
+    pub scanline: usize,
     nametable: u8,
     attribute_table: u8,
     bg_pattern_offset: bool,
@@ -152,6 +152,7 @@ pub struct Ppu {
     tile_high: u8,
     sprite_offset: bool,
     base_namtable_addr: u8,
+    pub cpu_nmi: bool,
     pub rom: Option<ines::File>,
 }
 
@@ -171,7 +172,7 @@ impl Ppu {
             canvas: [Color::new(); 256 * 240],
             prev_canvas: [Color::RGB(255,255,255); 256 * 240],
             updated: false,
-            nmi: false,
+            generate_nmi: false,
             scanline: 0,
             current_cycle: 0,
             nametable: 0,
@@ -181,6 +182,7 @@ impl Ppu {
             tile_high: 0,
             sprite_offset: false,
             base_namtable_addr: 0,
+            cpu_nmi: false,
             rom: None,
         }
     }
@@ -225,7 +227,7 @@ impl Ppu {
             0 => (),
             1...239 => self.visible_scanline_cycle(),
             240 => (),
-            241 => self.vblank(),
+            241 => if self.current_cycle == 1 { self.vblank() },
             242...260 => (),
             261 => self.prerender_scanline(),
             _ => panic!("Invalid scanline encountered: {}", self.scanline),
@@ -471,7 +473,7 @@ impl Ppu {
     /// +--------- Generate an NMI at the start of the
     ///            vertical blanking interval (0: off; 1: on)
     fn write_ppuctrl(&mut self, byte: u8) {
-        self.nmi = (0x80 & byte) != 0;
+        self.generate_nmi = (0x80 & byte) != 0;
         self.bg_pattern_offset = (0x10 & byte) != 0;
         self.sprite_offset = (0x08 & byte) != 0;
         self.base_namtable_addr = (0x03 & byte);
@@ -510,7 +512,7 @@ impl Ppu {
     }
 
     fn write_scroll(&mut self, byte: u8) {
-
+        println!("Scroll unimplemented");
     }
 
     /// $0000-$0FFF 	$1000 	Pattern table 0
@@ -575,6 +577,9 @@ impl Ppu {
 
     pub fn vblank(&mut self) {
         self.vblank.set(true);
+        if self.generate_nmi {
+            self.cpu_nmi = true;
+        }
     }
 
     fn prerender_scanline(&mut self) {
