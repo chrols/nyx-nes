@@ -4,6 +4,8 @@ use super::gamepad::Gamepad;
 use super::ines;
 use super::kevtris;
 use super::ppu::Ppu;
+use super::mapper::Cartridge;
+use super::mapper;
 
 pub struct Cpu {
     a: u8,
@@ -19,7 +21,7 @@ pub struct Cpu {
     v: bool, // Overflow flag
     n: bool, // Negative flag
     pub headless: bool, // Headless testing mode
-    rom: Option<ines::File>,
+    rom: Option<Box<Cartridge>>,
     pub ppu: Ppu,
     pub cyc: u64,
     pub gamepad: Gamepad,
@@ -201,8 +203,8 @@ impl Cpu {
 
     pub fn load_game(&mut self, file: ines::File) {
         let clone = file.clone();
-        self.rom = Some(file);
-        self.ppu.rom = Some(clone);
+        self.rom = Some(mapper::new_mapper(file));
+        self.ppu.rom = Some(mapper::new_mapper(clone));
     }
 
     fn adc(&mut self, step: &Step) {
@@ -688,11 +690,8 @@ impl Cpu {
             0x4016 => { self.gamepad.read() }
             0x4017 => { println!("Gamepad 2 {:X}", address); 0},
             0x4018...0x401F => panic!("Read from disabled registers"),
-            0x4020...0xFFFF => match &self.rom {
-                Some(game) => match game.mapper {
-                    0 => game.prg_rom[(address as usize - if game.prg_rom_blocks == 1 { 0xC000} else { 0x8000 } as usize)],
-                    _ => panic!("Unimplemented mapper"),
-                },
+            0x4020...0xFFFF => match &mut self.rom {
+                Some(game) => game.read(address),
                 None => panic!("No game loaded"),
             },
         }
@@ -733,7 +732,10 @@ impl Cpu {
             },
             0x4017 => println!("Gamepad {:X} = {:X}", address, byte),
             0x4018...0x401F => println!("Write to disabled memory area"),
-            _ => (),
+            0x4020...0xFFFF => match &mut self.rom {
+                Some(game) => game.write(address, byte),
+                None => panic!("No game loaded"),
+            }
         }
     }
 

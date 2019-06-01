@@ -3,6 +3,7 @@
 use super::ines;
 use std::cell::Cell;
 use std::panic;
+use crate::mapper::Cartridge;
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -153,7 +154,7 @@ pub struct Ppu {
     sprite_offset: bool,
     base_namtable_addr: u8,
     pub cpu_nmi: bool,
-    pub rom: Option<ines::File>,
+    pub rom: Option<Box<Cartridge>>,
 }
 
 impl Ppu {
@@ -526,8 +527,8 @@ impl Ppu {
     /// $3F20-$3FFF 	$00E0 	Mirrors of $3F00-$3F1F
     fn read_memory(&mut self, address: u16) -> u8 {
         match address {
-            0x0000...0x1FFF => match &self.rom {
-                Some(game) => game.chr_rom[address as usize],
+            0x0000...0x1FFF => match &mut self.rom {
+                Some(game) => game.ppu_read(address),
                 None => panic!("No game loaded"),
             },
             0x2000...0x3FFF => self.vram[address as usize],
@@ -537,7 +538,10 @@ impl Ppu {
 
     fn write_memory(&mut self, address: u16, byte: u8) {
         match address {
-            0x0000...0x1FFF => println!("Write to rom ${:04X}!", address),
+            0x0000...0x1FFF => match &mut self.rom {
+                Some(game) => game.ppu_write(address, byte),
+                None => panic!("No game loaded"),
+            },
             0x2000...0x2FFF => self.vram[address as usize] = byte,
             0x3000...0x3EFF => self.vram[address as usize - 0x1000] = byte,
             0x3F00...0x3F1F => self.vram[address as usize] = byte,
