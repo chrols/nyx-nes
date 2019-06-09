@@ -1,6 +1,5 @@
 //! http://wiki.nesdev.com/w/index.php/PPU_rendering
 
-use super::ines;
 use std::cell::Cell;
 use std::panic;
 use crate::mapper::Cartridge;
@@ -23,7 +22,7 @@ impl Color {
         Color { r: 0, g: 0, b: 0 }
     }
 
-    pub fn RGB(r: u8, g: u8, b: u8) -> Color {
+    pub fn rgb(r: u8, g: u8, b: u8) -> Color {
         Color { r, g, b }
     }
 }
@@ -38,73 +37,73 @@ pub struct OamData {
 
 fn palette(byte: u8) -> Color {
     match byte {
-        0 => Color::RGB(84, 84, 84),
-        1 => Color::RGB(0, 30, 116),
-        2 => Color::RGB(8, 16, 144),
-        3 => Color::RGB(48, 0, 136),
-        4 => Color::RGB(68, 0, 100),
-        5 => Color::RGB(92, 0, 48),
-        6 => Color::RGB(84, 4, 0),
-        7 => Color::RGB(60, 24, 0),
-        8 => Color::RGB(32, 42, 0),
-        9 => Color::RGB(8, 58, 0),
-        10 => Color::RGB(0, 64, 0),
-        11 => Color::RGB(0, 60, 0),
-        12 => Color::RGB(0, 50, 60),
-        13 => Color::RGB(0, 0, 0),
-        14 => Color::RGB(0, 0, 0),
-        15 => Color::RGB(0, 0, 0),
-        16 => Color::RGB(152, 150, 152),
-        17 => Color::RGB(8, 76, 196),
-        18 => Color::RGB(48, 50, 236),
-        19 => Color::RGB(92, 30, 228),
-        20 => Color::RGB(136, 20, 176),
-        21 => Color::RGB(160, 20, 100),
-        22 => Color::RGB(152, 34, 32),
-        23 => Color::RGB(120, 60, 0),
-        24 => Color::RGB(84, 90, 0),
-        25 => Color::RGB(40, 114, 0),
-        26 => Color::RGB(8, 124, 0),
-        27 => Color::RGB(0, 118, 40),
-        28 => Color::RGB(0, 102, 120),
-        29 => Color::RGB(0, 0, 0),
-        30 => Color::RGB(0, 0, 0),
-        31 => Color::RGB(0, 0, 0),
-        32 => Color::RGB(236, 238, 236),
-        33 => Color::RGB(76, 154, 236),
-        34 => Color::RGB(120, 124, 236),
-        35 => Color::RGB(176, 98, 236),
-        36 => Color::RGB(228, 84, 236),
-        37 => Color::RGB(236, 88, 180),
-        38 => Color::RGB(236, 106, 100),
-        39 => Color::RGB(212, 136, 32),
-        40 => Color::RGB(160, 170, 0),
-        41 => Color::RGB(116, 196, 0),
-        42 => Color::RGB(76, 208, 32),
-        43 => Color::RGB(56, 204, 108),
-        44 => Color::RGB(56, 180, 204),
-        45 => Color::RGB(60, 60, 60),
-        46 => Color::RGB(0, 0, 0),
-        47 => Color::RGB(0, 0, 0),
-        48 => Color::RGB(236, 238, 236),
-        49 => Color::RGB(168, 204, 236),
-        50 => Color::RGB(188, 188, 236),
-        51 => Color::RGB(212, 178, 236),
-        52 => Color::RGB(236, 174, 236),
-        53 => Color::RGB(236, 174, 212),
-        54 => Color::RGB(236, 180, 176),
-        55 => Color::RGB(228, 196, 144),
-        56 => Color::RGB(204, 210, 120),
-        57 => Color::RGB(180, 222, 120),
-        58 => Color::RGB(168, 226, 144),
-        59 => Color::RGB(152, 226, 180),
-        60 => Color::RGB(160, 214, 228),
-        61 => Color::RGB(160, 162, 160),
-        62 => Color::RGB(0, 0, 0),
-        63 => Color::RGB(0, 0, 0),
+        0 => Color::rgb(84, 84, 84),
+        1 => Color::rgb(0, 30, 116),
+        2 => Color::rgb(8, 16, 144),
+        3 => Color::rgb(48, 0, 136),
+        4 => Color::rgb(68, 0, 100),
+        5 => Color::rgb(92, 0, 48),
+        6 => Color::rgb(84, 4, 0),
+        7 => Color::rgb(60, 24, 0),
+        8 => Color::rgb(32, 42, 0),
+        9 => Color::rgb(8, 58, 0),
+        10 => Color::rgb(0, 64, 0),
+        11 => Color::rgb(0, 60, 0),
+        12 => Color::rgb(0, 50, 60),
+        13 => Color::rgb(0, 0, 0),
+        14 => Color::rgb(0, 0, 0),
+        15 => Color::rgb(0, 0, 0),
+        16 => Color::rgb(152, 150, 152),
+        17 => Color::rgb(8, 76, 196),
+        18 => Color::rgb(48, 50, 236),
+        19 => Color::rgb(92, 30, 228),
+        20 => Color::rgb(136, 20, 176),
+        21 => Color::rgb(160, 20, 100),
+        22 => Color::rgb(152, 34, 32),
+        23 => Color::rgb(120, 60, 0),
+        24 => Color::rgb(84, 90, 0),
+        25 => Color::rgb(40, 114, 0),
+        26 => Color::rgb(8, 124, 0),
+        27 => Color::rgb(0, 118, 40),
+        28 => Color::rgb(0, 102, 120),
+        29 => Color::rgb(0, 0, 0),
+        30 => Color::rgb(0, 0, 0),
+        31 => Color::rgb(0, 0, 0),
+        32 => Color::rgb(236, 238, 236),
+        33 => Color::rgb(76, 154, 236),
+        34 => Color::rgb(120, 124, 236),
+        35 => Color::rgb(176, 98, 236),
+        36 => Color::rgb(228, 84, 236),
+        37 => Color::rgb(236, 88, 180),
+        38 => Color::rgb(236, 106, 100),
+        39 => Color::rgb(212, 136, 32),
+        40 => Color::rgb(160, 170, 0),
+        41 => Color::rgb(116, 196, 0),
+        42 => Color::rgb(76, 208, 32),
+        43 => Color::rgb(56, 204, 108),
+        44 => Color::rgb(56, 180, 204),
+        45 => Color::rgb(60, 60, 60),
+        46 => Color::rgb(0, 0, 0),
+        47 => Color::rgb(0, 0, 0),
+        48 => Color::rgb(236, 238, 236),
+        49 => Color::rgb(168, 204, 236),
+        50 => Color::rgb(188, 188, 236),
+        51 => Color::rgb(212, 178, 236),
+        52 => Color::rgb(236, 174, 236),
+        53 => Color::rgb(236, 174, 212),
+        54 => Color::rgb(236, 180, 176),
+        55 => Color::rgb(228, 196, 144),
+        56 => Color::rgb(204, 210, 120),
+        57 => Color::rgb(180, 222, 120),
+        58 => Color::rgb(168, 226, 144),
+        59 => Color::rgb(152, 226, 180),
+        60 => Color::rgb(160, 214, 228),
+        61 => Color::rgb(160, 162, 160),
+        62 => Color::rgb(0, 0, 0),
+        63 => Color::rgb(0, 0, 0),
         _ => {
             println!("Illegal palette: {:X}", byte);
-            Color::RGB(0,0,0)
+            Color::rgb(0,0,0)
         }
     }
 }
@@ -138,16 +137,12 @@ pub struct Ppu {
     sprite_overflow: bool,
     vram: [u8; 0x4000],
     low_address: bool,
-    scroll_x: u8,
-    scroll_y: u8,
     pub canvas: [Color; 256 * 240],
     pub prev_canvas: [Color; 256 * 240],
     pub updated: bool,
     generate_nmi: bool,
     pub current_cycle: usize,
     pub scanline: usize,
-    nametable: u8,
-    attribute_table: u8,
     bg_pattern_offset: bool,
     tile_low: u8,
     tile_high: u8,
@@ -168,16 +163,12 @@ impl Ppu {
             vram: [0; 0x4000],
             address: 0,
             low_address: false,
-            scroll_x: 0,
-            scroll_y: 0,
             canvas: [Color::new(); 256 * 240],
-            prev_canvas: [Color::RGB(255,255,255); 256 * 240],
+            prev_canvas: [Color::rgb(255,255,255); 256 * 240],
             updated: false,
             generate_nmi: false,
             scanline: 0,
             current_cycle: 0,
-            nametable: 0,
-            attribute_table: 0,
             bg_pattern_offset: false,
             tile_low: 0,
             tile_high: 0,
@@ -272,14 +263,14 @@ impl Ppu {
 
     fn mirror_byte(byte: u8) -> u8 {
         let mut mirror = 0;
-        if (byte & 0x01 != 0) { mirror |= 0x80; }
-        if (byte & 0x02 != 0) { mirror |= 0x40; }
-        if (byte & 0x04 != 0) { mirror |= 0x20; }
-        if (byte & 0x08 != 0) { mirror |= 0x10; }
-        if (byte & 0x10 != 0) { mirror |= 0x08; }
-        if (byte & 0x20 != 0) { mirror |= 0x04; }
-        if (byte & 0x40 != 0) { mirror |= 0x02; }
-        if (byte & 0x80 != 0) { mirror |= 0x01; }
+        if byte & 0x01 != 0 { mirror |= 0x80; }
+        if byte & 0x02 != 0 { mirror |= 0x40; }
+        if byte & 0x04 != 0 { mirror |= 0x20; }
+        if byte & 0x08 != 0 { mirror |= 0x10; }
+        if byte & 0x10 != 0 { mirror |= 0x08; }
+        if byte & 0x20 != 0 { mirror |= 0x04; }
+        if byte & 0x40 != 0 { mirror |= 0x02; }
+        if byte & 0x80 != 0 { mirror |= 0x01; }
         mirror
     }
 
@@ -308,7 +299,7 @@ impl Ppu {
             high_byte = Ppu::mirror_byte(high_byte);
         }
 
-        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, (x - oam.left));
+        let pixel = Ppu::bytes_to_pixel(high_byte, low_byte, x - oam.left);
 
         if pixel == 0 {
             return None;
@@ -477,7 +468,7 @@ impl Ppu {
         self.generate_nmi = (0x80 & byte) != 0;
         self.bg_pattern_offset = (0x10 & byte) != 0;
         self.sprite_offset = (0x08 & byte) != 0;
-        self.base_namtable_addr = (0x03 & byte);
+        self.base_namtable_addr = 0x03 & byte;
 
     }
 
