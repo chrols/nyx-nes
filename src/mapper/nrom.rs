@@ -14,7 +14,7 @@ impl Cartridge for NROM {
     }
 
     fn write(&mut self, address: u16, byte: u8) {
-        panic!("Attempt to write to NROM!");
+        panic!("Attempt to write to NROM: {:04X} = {:02X}", address, byte);
     }
 
     fn ppu_read(&mut self, address: u16) -> u8 {
@@ -25,7 +25,7 @@ impl Cartridge for NROM {
     }
 
     fn ppu_write(&mut self, address: u16, byte: u8) {
-        panic!("Attempt to write to NROM!");
+        panic!("Attempt to write to NROM: {:04X} = {:02X}", address, byte);
     }
 
 }

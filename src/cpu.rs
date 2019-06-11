@@ -186,9 +186,11 @@ impl Cpu {
         let nestest = ines::File::read("rom/nestest.nes");
         let mut cpu = Cpu::new();
         cpu.headless = true;
+        cpu.ppu.vertical_mirroring = nestest.mirroring == ines::Mirroring::Vertical;
         cpu.load_game(nestest);
         cpu.reset();
         cpu.pc = 0xC000;
+
 
         loop {
             cpu.cycle();
