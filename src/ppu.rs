@@ -431,7 +431,10 @@ impl Ppu {
 
     fn attribute_byte(&mut self) -> u8 {
         let attribute_address = 0x23C0 | (self.address & 0x0C00) | ((self.address >> 4) & 0x38) | ((self.address >> 2) & 0x07);
-        self.read_memory(attribute_address)
+        let attribute_byte = self.read_memory(attribute_address);
+        let shift = ((self.address >> 4) & 4) | (self.address & 2);
+
+        ((attribute_byte >> shift) & 3)
     }
 
     fn bg_attribute_from_table(&mut self, attr_byte: u8, x: u16, y: u16) -> u16 {
@@ -476,10 +479,7 @@ impl Ppu {
 
         assert!(color < 4);
 
-        let shift = ((self.address >> 4) & 4) | (self.address & 2);
-        let attribute = (self.attribute >> shift) & 0x3;
-
-        let palette_addr = (attribute as u16 * 4) + 0x3F00 + color as u16;
+        let palette_addr = (self.attribute as u16 * 4) + 0x3F00 + color as u16;
         Some(palette(self.read_memory(palette_addr)))
     }
 
