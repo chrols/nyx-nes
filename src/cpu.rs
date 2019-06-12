@@ -688,9 +688,9 @@ impl Cpu {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize],
             0x2000...0x3FFF => self.ppu.read(address),
-            0x4000...0x4015 => { println!("APU Unimplemented"); 0 }
+            0x4000...0x4015 => { 0 }, // FIXME Implement APUI
             0x4016 => { self.gamepad.read() }
-            0x4017 => { println!("Gamepad 2 {:X}", address); 0},
+            0x4017 => { 0}, // FIXME Implement gamepad 2
             0x4018...0x401F => panic!("Read from disabled registers"),
             0x4020...0xFFFF => match &mut self.rom {
                 Some(game) => game.read(address),
@@ -722,9 +722,9 @@ impl Cpu {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize] = byte,
             0x2000...0x3FFF => self.ppu.write(address, byte),
-            0x4000...0x4013 => println!("APU Unimplemented"),
+            0x4000...0x4013 => (), // FIXME Implement APU
             0x4014 => self.oam_dma(byte),
-            0x4015 => println!("APU Unimplemented"),
+            0x4015 => (), // FIXME Implement APU
             0x4016 => {
                 if (0x01 & byte) == 1 {
                     self.gamepad.start_poll();
@@ -732,7 +732,7 @@ impl Cpu {
                     self.gamepad.stop_poll();
                 }
             },
-            0x4017 => println!("Gamepad {:X} = {:X}", address, byte),
+            0x4017 => (), // FIXME Implement gamepad 2
             0x4018...0x401F => println!("Write to disabled memory area"),
             0x4020...0xFFFF => match &mut self.rom {
                 Some(game) => game.write(address, byte),

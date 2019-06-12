@@ -8,6 +8,7 @@ use std::time::Instant;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::controller::Button;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
@@ -65,6 +66,10 @@ fn render(canvas: &mut Canvas<Window>, ppu: &mut Ppu) {
 pub fn execute(cpu: &mut Cpu) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
+    let controller_subsystem = sdl_context.game_controller().unwrap();
+    let gamepad = controller_subsystem.open(0).unwrap();
+
+    println!("Game controllers: {}", controller_subsystem.num_joysticks().unwrap());
 
     let window = video_subsystem
         .window("RNES Emulator", SCREEN_W, SCREEN_H)
@@ -84,15 +89,51 @@ pub fn execute(cpu: &mut Cpu) {
     'running: loop {
 
         if cpu.cyc % 29829 == 0 {
-        for event in event_pump.poll_iter() {
+            for event in event_pump.poll_iter() {
+            //println!("{:?}", event);
             match event {
+                Event::ControllerButtonDown {
+                    button,
+                    ..
+                } => {
+                    match button {
+                        Button::DPadLeft => cpu.gamepad.left = true,
+                        Button::DPadRight => cpu.gamepad.right = true,
+                        Button::DPadUp => cpu.gamepad.up = true,
+                        Button::DPadDown => cpu.gamepad.down = true,
+                        Button::Back => cpu.gamepad.select = true,
+                        Button::Start => cpu.gamepad.start = true,
+                        Button::A => cpu.gamepad.a = true,
+                        Button::X => cpu.gamepad.b = true,
+                        _ => println!("{:?}", button),
+                    }
+
+                },
+                Event::ControllerButtonUp {
+                    button,
+                    ..
+                } => {
+                    match button {
+                        Button::DPadLeft => cpu.gamepad.left = false,
+                        Button::DPadRight => cpu.gamepad.right = false,
+                        Button::DPadUp => cpu.gamepad.up = false,
+                        Button::DPadDown => cpu.gamepad.down = false,
+                        Button::Back => cpu.gamepad.select = false,
+                        Button::Start => cpu.gamepad.start = false,
+                        Button::A => cpu.gamepad.a = false,
+                        Button::X => cpu.gamepad.b = false,
+                        _ => println!("{:?}", button),
+                    }
+
+                },
                 Event::Quit { .. }
                 | Event::KeyDown {
                     keycode: Some(Keycode::Escape),
                     ..
                 } => break 'running,
                 Event::KeyDown {
-                    keycode: Some(kc), ..
+                    keycode: Some(kc),
+                    ..
                 } => {
                     match kc {
                         Keycode::Num1 => cpu.headless = true,
