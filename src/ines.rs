@@ -1,5 +1,7 @@
 use std::fs;
 
+extern crate zip;
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Mirroring {
     Horizontal,
@@ -21,13 +23,52 @@ pub struct File {
 }
 
 
+fn unzip(file: &Vec<u8>) -> Result<Vec<u8>, &'static str>
+{
+    use std::io::prelude::*;
+
+
+    let mut reader = std::io::Cursor::new(file);
+
+    let mut zip = match zip::ZipArchive::new(reader) {
+        Ok(data) => data,
+        Err(error) => return Err("ZipFile error"),
+    };
+
+    for i in 0..zip.len()
+    {
+        let mut file = zip.by_index(i).unwrap();
+        println!("Filename: {}", file.name());
+
+        let mut buf:Vec<u8> = file.bytes().map(|byte| byte.unwrap()).collect();
+
+        if File::nes_header(&buf) {
+            return Ok(buf);
+        }
+    }
+
+    Err("No file")
+}
+
 impl File {
-    pub fn read(filename: &str) -> File {
+
+    fn nes_header(data: &Vec<u8>) -> bool {
+        data[0..4] == [0x4E, 0x45, 0x53, 0x1A]
+    }
+
+    fn open_file(filename: &str) -> Result<Vec<u8>, &'static str> {
         let file = fs::read(filename).expect("Could not read provided file");
 
-        if file[0..4] != [0x4E, 0x45, 0x53, 0x1A] {
-            panic!("Provided file does not appear to be a valid NES ROM file");
+        if File::nes_header(&file) {
+            Ok(file)
+        } else {
+            unzip(&file)
         }
+
+    }
+
+    pub fn read(filename: &str) -> File {
+        let file = File::open_file(filename).expect("Unable to open file!");
 
         let prg_rom_blocks = file[4];
         let chr_rom_blocks = file[5];

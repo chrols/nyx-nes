@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 sdl2 = "~0.32.1"
 rand = "0.6.5"
+zip = "0.5.2"
