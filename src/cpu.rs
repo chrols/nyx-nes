@@ -672,8 +672,6 @@ impl Cpu {
     }
 
     fn nmi(&mut self) {
-        println!("NMI!");
-
         self.push_word(self.pc);
         self.php(&Step::new());
         self.pc = self.read_word(0xFFFA);

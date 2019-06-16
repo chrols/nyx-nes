@@ -123,6 +123,13 @@ impl OamData {
         let y_hit = y >= self.top && y < (self.top.saturating_add(8));
         x_hit && y_hit
     }
+
+    fn contains_large(&self, x: u8, y: u8) -> bool {
+        let x_hit = x >= self.left && x < (self.left.saturating_add(8));
+        let y_hit = y >= self.top && y < (self.top.saturating_add(8));
+        x_hit && y_hit
+    }
+
 }
 
 pub struct Ppu {
@@ -145,7 +152,13 @@ pub struct Ppu {
 
     another_address: u16,
 
+    // PPUCTRL flags
     vram_increment: bool,
+    sprite_offset: bool,
+    bg_pattern_offset: bool,
+    large_sprites: bool,
+    generate_nmi: bool,
+
     pub vertical_mirroring: bool,
     // Sprites
     oam: [u8; 0x100],
@@ -157,12 +170,8 @@ pub struct Ppu {
     pub canvas: [Color; 256 * 240],
     pub prev_canvas: [Color; 256 * 240],
     pub updated: bool,
-    generate_nmi: bool,
     pub current_cycle: usize,
     pub scanline: usize,
-    bg_pattern_offset: bool,
-    sprite_offset: bool,
-    base_namtable_addr: u8,
     pub cpu_nmi: bool,
     pub rom: Option<Box<Cartridge>>,
 }
@@ -173,6 +182,7 @@ impl Ppu {
             address: 0,
             another_address: 0,
             vram_increment: false,
+            large_sprites: false,
             vertical_mirroring: false,
             temp_address: 0,
             write_toggle: false,
@@ -194,7 +204,6 @@ impl Ppu {
             current_cycle: 0,
             bg_pattern_offset: false,
             sprite_offset: false,
-            base_namtable_addr: 0,
             cpu_nmi: false,
             rom: None,
         }
@@ -332,13 +341,25 @@ impl Ppu {
         mirror
     }
 
-    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
-        let mut tile_addr = (oam.index as u16) << 4;
+    fn tile_address_for_index(&self, index: u8) -> u16 {
 
-        if self.sprite_offset {
-            tile_addr += 0x1000;
+        if self.large_sprites {
+            Ppu::address_large_tile(index)
+        } else {
+            Ppu::address_regular_tile(index, self.sprite_offset)
         }
+    }
 
+    fn address_large_tile(index: u8) -> u16 {
+        (((index & 0xFE) as u16) << 4) + if (index & 1) != 0 { 0x1000 } else { 0 }
+    }
+
+    fn address_regular_tile(index: u8, offset: bool) -> u16 {
+        ((index as u16) << 4) + if offset { 0x1000 } else { 0 }
+    }
+
+    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
+        let mut tile_addr = self.tile_address_for_index(oam.index);
         let horizontal_mirror = oam.attr & 0x80 != 0;
 
         let y_offset = if horizontal_mirror {
@@ -420,7 +441,14 @@ impl Ppu {
 
         for i in 0..64 {
             let oam = self.read_oam(i * 4);
-            if oam.contains(x, y) {
+
+            let contained = if self.large_sprites {
+                oam.contains_large(x, y)
+            } else {
+                oam.contains(x, y)
+            };
+
+            if contained {
                 if let Some(color) = self.sprite_color(x, y, oam) {
                     return Some(color);
                 }
@@ -431,6 +459,7 @@ impl Ppu {
     }
 
     fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
+        assert!(x < 8);
         let x_offset = 7 - x;
         ((low >> x_offset) & 0x01) + 2 * ((high >> x_offset) & 0x01)
     }
@@ -535,9 +564,9 @@ impl Ppu {
 
         self.vram_increment = (0x04 & byte) != 0;
         self.sprite_offset = (0x08 & byte) != 0;
-        self.bg_pattern_offset = (0x10 & byte) != 0;
-        // FIXME Sprite size selection
 
+        self.bg_pattern_offset = (0x10 & byte) != 0;
+        self.large_sprites = (0x02 & byte) != 0;
         self.generate_nmi = (0x80 & byte) != 0;
     }
 
@@ -744,11 +773,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn alternating_ppuaddr() {
-        let mut ppu = Ppu::new();
-        ppu.write_address(0x20);
-        ppu.write_address(0x10);
-        assert_eq!(0x2010, ppu.address);
+    fn large_sprite_address() {
+        assert_eq!(0x0000, Ppu::address_large_tile(0));
+        assert_eq!(0x1000, Ppu::address_large_tile(1));
+        assert_eq!(0x0020, Ppu::address_large_tile(2));
+        assert_eq!(0x1020, Ppu::address_large_tile(3));
     }
-
 }
