@@ -7,8 +7,13 @@ pub struct NROM {
 
 impl Cartridge for NROM {
     fn read(&mut self, address: u16) -> u8 {
+        let mut ram_address = address - 0x8000;
+        if self.file.prg_rom_blocks == 1 {
+            ram_address %= 0x4000;
+        }
+
         match address {
-            0x4020...0xFFFF => self.file.prg_rom[(address as usize - if self.file.prg_rom_blocks == 1 { 0xC000} else { 0x8000 } as usize)],
+            0x4020...0xFFFF => self.file.prg_rom[ram_address as usize],
             _ => panic!("Read outside scope: {:04X}", address),
         }
     }
