@@ -145,6 +145,7 @@ pub struct Ppu {
 
     another_address: u16,
 
+    vram_increment: bool,
     pub vertical_mirroring: bool,
     // Sprites
     oam: [u8; 0x100],
@@ -171,6 +172,7 @@ impl Ppu {
         Ppu {
             address: 0,
             another_address: 0,
+            vram_increment: false,
             vertical_mirroring: false,
             temp_address: 0,
             write_toggle: false,
@@ -200,6 +202,7 @@ impl Ppu {
 
     pub fn read(&mut self, address: u16) -> u8 {
         match address % 8 {
+            1 => 0,
             2 => self.read_status(),
             7 => {
                 let m = self.read_memory(self.another_address);
@@ -218,12 +221,15 @@ impl Ppu {
             4 => self.write_oamdata(byte),
             5 => self.write_scroll(byte),
             6 => self.write_address(byte),
-            7 => {
-                self.write_memory(self.another_address, byte);
-                self.another_address = self.another_address.wrapping_add(1);
-            }
+            7 => self.write_data(byte),
             _ => panic!("Unimplemented register: {:X}", address % 8),
         }
+    }
+
+    fn write_data(&mut self, byte: u8) {
+        self.write_memory(self.another_address, byte);
+        let increment = if self.vram_increment { 32 } else { 1 };
+        self.another_address = self.another_address.wrapping_add(increment);
     }
 
     /// The PPU renders 262 scanlines per frame. Each scanline lasts for
@@ -527,10 +533,12 @@ impl Ppu {
         // t: ... BA.. .... .... = d: .... ..BA
         self.temp_address = (self.temp_address & 0xF3FF) | (byte as u16 & 0x3) << 10;
 
-        self.generate_nmi = (0x80 & byte) != 0;
-        self.bg_pattern_offset = (0x10 & byte) != 0;
+        self.vram_increment = (0x04 & byte) != 0;
         self.sprite_offset = (0x08 & byte) != 0;
-        self.base_namtable_addr = 0x03 & byte;
+        self.bg_pattern_offset = (0x10 & byte) != 0;
+        // FIXME Sprite size selection
+
+        self.generate_nmi = (0x80 & byte) != 0;
     }
 
     /// 7  bit  0
