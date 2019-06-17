@@ -3,6 +3,7 @@ use super::ines::File;
 mod nrom;
 mod mmc1;
 mod uxrom;
+mod axrom;
 
 pub trait Cartridge {
     fn read(&mut self, address: u16) -> u8;
@@ -26,6 +27,7 @@ pub fn new_mapper(file: File) -> Box<Cartridge> {
         0 => Box::new(nrom::NROM { file }),
         1 => Box::new(mmc1::MMC1::new(file)),
         2 => Box::new(uxrom::UxROM::new(file)),
+        7 => Box::new(axrom::AxROM::new(file)),
         _ => panic!("Unimplemented mapper!"),
     }
 }
