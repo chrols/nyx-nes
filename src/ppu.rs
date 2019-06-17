@@ -675,7 +675,15 @@ impl Ppu {
                 }
             }
             0x3000...0x3EFF => self.actual_vram_address(address - 0x1000),
-            0x3F00...0x3F1F => address,
+            0x3F00...0x3F0F => address,
+            0x3F10 => 0x3F00,
+            0x3F11...0x3F13 => address,
+            0x3F14 => 0x3F04,
+            0x3F15...0x3F17 => address,
+            0x3F18 => 0x3F08,
+            0x3F19...0x3F1B => address,
+            0x3F1C => 0x3F0C,
+            0x3F1D...0x3F1F => address,
             0x3F20...0x3FFF => 0x3F00 + (address - 0x3F00) % 0x20,
             _ => panic!("Invalid VRAM address provided: {:04X}", address),
         }
@@ -778,5 +786,18 @@ mod tests {
         assert_eq!(0x1000, Ppu::address_large_tile(1));
         assert_eq!(0x0020, Ppu::address_large_tile(2));
         assert_eq!(0x1020, Ppu::address_large_tile(3));
+    }
+
+    #[test]
+    fn palette_mirroring() {
+        let mut ppu = Ppu::new();
+        ppu.write_memory(0x3F00, 100);
+        assert_eq!(ppu.actual_vram_address(0x3F00), 0x3F00);
+        assert_eq!(ppu.actual_vram_address(0x3F10), 0x3F00);
+        assert_eq!(ppu.read_memory(0x3F00), 100);
+        assert_eq!(ppu.read_memory(0x3F10), 100);
+        ppu.write_memory(0x3F10, 200);
+        assert_eq!(ppu.read_memory(0x3F00), 200);
+        assert_eq!(ppu.read_memory(0x3F10), 200);
     }
 }
