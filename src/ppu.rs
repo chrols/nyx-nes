@@ -526,17 +526,16 @@ impl Ppu {
         let x = self.current_cycle - 1;
         let y = self.scanline;
 
-        //if y % 2 ==  { return; }
-
         self.canvas[(y * 256 + x) as usize] = if let Some(sprite_pixel) = self.sprite_pixel() {
+            if let Some(_) = self.bg_pixel() {
+                self.sprite_zero = true;
+            }
             sprite_pixel
         } else if let Some(bg_pixel) = self.bg_pixel() {
             bg_pixel
         } else {
             self.universal_bg()
         }
-
-        //self.canvas[(y * 256 + x) as usize] = self.chr_pixel();
     }
 
     /// $2000 PPUCTRL
@@ -732,6 +731,7 @@ impl Ppu {
         self.updated = true;
 
         match self.current_cycle {
+            1 => self.sprite_zero = false,
             257 => self.t2v(),
             _ => (),
         }
