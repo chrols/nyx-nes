@@ -4,6 +4,7 @@ mod nrom;
 mod mmc1;
 mod uxrom;
 mod axrom;
+pub mod dummy;
 
 pub trait Cartridge {
     fn read(&mut self, address: u16) -> u8;

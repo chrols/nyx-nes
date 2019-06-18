@@ -1,8 +1,11 @@
 //! http://wiki.nesdev.com/w/index.php/PPU_rendering
 
 use crate::mapper::Cartridge;
+use crate::mapper::dummy::DummyROM;
+
 use std::cell::Cell;
 use std::panic;
+
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -145,9 +148,10 @@ pub struct Ppu {
     address: u16,       // Current VRAM address AKA v
     temp_address: u16,  // Temporary VRAM address AKA t
     write_toggle: bool, // AKA w
-    bg_tile_low: u8,
-    bg_tile_high: u8,
+    bg_tile_low: u16,
+    bg_tile_high: u16,
     attribute: u8,
+    attribute_latch: u8,
     fine_x: u8,
 
     another_address: u16,
@@ -190,6 +194,7 @@ impl Ppu {
             bg_tile_high: 0,
             fine_x: 0,
             attribute: 0,
+            attribute_latch: 0,
             oam: [0; 0x100],
             oam_addr: 0,
             vblank: Cell::new(false),
@@ -200,12 +205,12 @@ impl Ppu {
             prev_canvas: [Color::rgb(255, 255, 255); 256 * 240],
             updated: false,
             generate_nmi: false,
-            scanline: 0,
+            scanline: 261,
             current_cycle: 0,
             bg_pattern_offset: false,
             sprite_offset: false,
             cpu_nmi: false,
-            rom: None,
+            rom: Some(DummyROM::new()),
         }
     }
 
@@ -269,45 +274,46 @@ impl Ppu {
         }
     }
 
-    /// Render a visible scanline
-    fn visible_scanline_cycle(&mut self) {
+    fn prerender_scanline(&mut self) {
+        self.vblank.set(true);
+        self.updated = true;
+
         match self.current_cycle {
-            0 => (),
-            1...256 => self.visible_scanline_render_cycle(),
-            256...320 => (),
-            321...336 => (),
-            337...340 => (),
+            1 => {
+                self.sprite_zero = false;
+                self.vblank.set(false);
+            },
+            2...255 => if self.current_cycle % 8 == 0 { self.coarse_x_increment() },
+            256 => self.y_increment(),
+            257 => self.horizontal_t2v(),
+            258...279 => (),
+            280...304 => self.vertical_t2v(),
+            305...320 => (),
+            321...336 => self.prefetch(),
             _ => (),
         }
     }
 
-    fn visible_scanline_render_cycle(&mut self) {
-        self.render_pixel();
-
-        match (self.current_cycle - 1) % 8 {
-            0 => {
-                let index_addr = 0x2000 | (self.address & 0xFFF);
-                let index = self.read_memory(index_addr);
-                let mut tile_addr = (index as u16) << 4;
-
-                if self.bg_pattern_offset {
-                    tile_addr += 0x1000
+    /// Render a visible scanline
+    fn visible_scanline_cycle(&mut self) {
+        match self.current_cycle {
+            0 => (),
+            1...255 => {
+                self.render_pixel();
+                if self.current_cycle % 8 == 0 {
+                    self.update_tile();
                 }
 
-                self.bg_tile_high = self.read_memory(tile_addr + (self.address >> 12) + 8);
-                self.bg_tile_low = self.read_memory(tile_addr + (self.address >> 12));
-
-                self.attribute = self.attribute_byte();
-
-                //println!("LIN: {} CYC: {} v = {:04X} ({:04X})", self.scanline, self.current_cycle, self.address, index_addr);
-                self.coarse_x_increment();
-            }
-            _ => (),
-        }
-
-        match self.current_cycle {
-            256 => self.y_increment(),
-            257 => self.t2v(),
+            },
+            256 => {
+                self.render_pixel();
+                self.update_tile();
+                self.y_increment();
+            },
+            257 => self.horizontal_t2v(),
+            258...320 => (),
+            321...336 => self.prefetch(),
+            337...340 => (),
             _ => (),
         }
     }
@@ -359,7 +365,7 @@ impl Ppu {
     }
 
     fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
-        let mut tile_addr = self.tile_address_for_index(oam.index);
+        let tile_addr = self.tile_address_for_index(oam.index);
         let horizontal_mirror = oam.attr & 0x80 != 0;
 
         let y_offset = if horizontal_mirror {
@@ -472,34 +478,9 @@ impl Ppu {
         ((attribute_byte >> shift) & 3)
     }
 
-    fn bg_attribute_from_table(&mut self, attr_byte: u8, x: u16, y: u16) -> u16 {
-        let ix = x % 32;
-        let iy = y % 32;
-
-        let attr = if ix >= 16 && iy >= 16 {
-            // Lower right
-            (attr_byte >> 6) & 0x3
-        } else if iy >= 16 {
-            // Upper right
-            (attr_byte >> 4) & 0x3
-        } else if ix >= 16 {
-            // Lower left
-            (attr_byte >> 2) & 0x3
-        } else {
-            // Upper left
-            attr_byte & 0x3
-        };
-
-        (attr as u16 * 4) + 0x3F00
-    }
-
     fn bg_pixel(&mut self) -> Option<Color> {
-        let x = (self.current_cycle - 1) as u16;
-        let y = (self.scanline) as u16;
-
-        // let color = Ppu::bytes_to_pixel(self.tile_high, self.tile_low, (x % 8) as u8);
-        let color = if (self.bg_tile_low & 0x80) != 0 { 1 } else { 0 }
-            + if (self.bg_tile_high & 0x80) != 0 {
+        let color = if (self.bg_tile_low & 0x8000) != 0 { 1 } else { 0 }
+            + if (self.bg_tile_high & 0x8000) != 0 {
                 2
             } else {
                 0
@@ -729,19 +710,40 @@ impl Ppu {
         }
     }
 
-    fn t2v(&mut self) {
+    fn horizontal_t2v(&mut self) {
+        // v: ....F.. ...EDCBA = t: ....F.. ...EDCBA
+	self.address = (self.address & 0xFBE0) | (self.temp_address & 0x041F);
+    }
+
+    fn vertical_t2v(&mut self) {
         // v: IHG F.ED CBA. .... = t: IHG F.ED CBA. ....
         self.address = (self.address & 0x041F) | (self.temp_address & !0x041F);
     }
 
-    fn prerender_scanline(&mut self) {
-        self.vblank.set(true);
-        self.updated = true;
+    fn update_tile(&mut self) {
+        let index_addr = 0x2000 | (self.address & 0xFFF);
+        let index = self.read_memory(index_addr);
+        let mut tile_addr = (index as u16) << 4;
 
-        match self.current_cycle {
-            1 => self.sprite_zero = false,
-            257 => self.t2v(),
-            _ => (),
+        if self.bg_pattern_offset {
+            tile_addr += 0x1000
+        }
+
+        self.bg_tile_high = (self.bg_tile_high & 0xFF00) | (self.read_memory(tile_addr + (self.address >> 12) + 8) as u16);
+        self.bg_tile_low = (self.bg_tile_low & 0xFF00) | (self.read_memory(tile_addr + (self.address >> 12)) as u16);
+
+        self.attribute = self.attribute_latch;
+        self.attribute_latch = self.attribute_byte();
+
+        self.coarse_x_increment();
+    }
+
+    fn prefetch(&mut self) {
+        if self.current_cycle == 336 {
+            self.update_tile();
+            self.bg_tile_high <<= 8;
+            self.bg_tile_low <<= 8;
+            self.update_tile();
         }
     }
 
@@ -756,7 +758,7 @@ impl Ppu {
     }
 
     fn y_increment(&mut self) {
-        if ((self.address & 0x7000) != 0x7000) {
+        if (self.address & 0x7000) != 0x7000 {
             // if fine Y < 7
             self.address += 0x1000 // increment fine Y
         } else {
@@ -800,4 +802,44 @@ mod tests {
         assert_eq!(ppu.read_memory(0x3F00), 200);
         assert_eq!(ppu.read_memory(0x3F10), 200);
     }
+
+    #[test]
+    fn x_increment_wraparound() {
+        let mut ppu = Ppu::new();
+        assert_eq!(ppu.address, 0);
+        ppu.coarse_x_increment();
+        assert_eq!(ppu.address, 1);
+
+        ppu.address = 31;
+        ppu.coarse_x_increment();
+        assert_eq!(ppu.address, 0x400);
+
+    }
+
+    #[test]
+    fn first_tiles() {
+        let mut ppu = Ppu::new();
+        ppu.write_memory(0x0010, 0xDE);
+        ppu.write_memory(0x0020, 0xAD);
+        ppu.write_memory(0x0018, 0xBE);
+        ppu.write_memory(0x0028, 0xEF);
+        ppu.write_memory(0x2000, 0x01);
+        ppu.write_memory(0x2001, 0x02);
+
+        assert_eq!(ppu.address, 0);
+        assert_eq!(ppu.scanline, 261);
+        assert_eq!(ppu.current_cycle, 0);
+
+        for _ in 0..341 {
+            ppu.cycle();
+        }
+
+        assert_eq!(ppu.scanline, 0);
+        assert_eq!(ppu.current_cycle, 0);
+        assert_eq!(ppu.address, 2);
+        assert_eq!(ppu.bg_tile_low, 0xDEAD);
+        assert_eq!(ppu.bg_tile_high, 0xBEEF);
+    }
+
+
 }
