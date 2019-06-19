@@ -36,7 +36,6 @@ impl Cartridge for UxROM {
         match address {
             0x6000...0x7FFF => self.sram[address as usize - 0x6000] = byte,
             0x8000...0xFFFF => {
-        println!("BANK SWITCH TO: {}", byte);
         let bank = byte & 0x0F;
         assert!(bank <= self.file.prg_rom_blocks);
         self.active_bank = bank;

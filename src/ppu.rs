@@ -2,6 +2,8 @@
 
 use crate::mapper::Cartridge;
 use crate::mapper::dummy::DummyROM;
+use crate::ines;
+use crate::mapper;
 
 use std::cell::Cell;
 use std::panic;
@@ -214,6 +216,12 @@ impl Ppu {
         }
     }
 
+    pub fn load_game(&mut self, file: ines::File) {
+        self.vertical_mirroring = file.mirroring == ines::Mirroring::Vertical;
+        self.rom = Some(mapper::new_mapper(file));
+    }
+
+
     pub fn read(&mut self, address: u16) -> u8 {
         match address % 8 {
             1 => 0,
@@ -414,6 +422,11 @@ impl Ppu {
         self.dump_memory(0x0000, 512);
     }
 
+    pub fn dump_internal_registers(&mut self) {
+        println!("--- Internal registers ---");
+        println!("T: {:04X} X: {:02X} V: {:04X}", self.temp_address, self.fine_x, self.address);
+    }
+
     pub fn dump_nametables(&mut self) {
         println!("--- Name tables ---");
         self.dump_memory(0x2000, 129);
@@ -479,8 +492,8 @@ impl Ppu {
     }
 
     fn bg_pixel(&mut self) -> Option<Color> {
-        let color = if (self.bg_tile_low & 0x8000) != 0 { 1 } else { 0 }
-            + if (self.bg_tile_high & 0x8000) != 0 {
+        let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 { 1 } else { 0 }
+            + if (self.bg_tile_high << self.fine_x & 0x8000) != 0 {
                 2
             } else {
                 0
@@ -594,8 +607,8 @@ impl Ppu {
             // t: ....... ...HGFED = d: HGFED...
             // x:              CBA = d: .....CBA
             // w:                  = 1
-            self.temp_address = (self.temp_address & 0xFF10) | (byte >> 3) as u16;
-            self.fine_x = byte & 0x3;
+            self.temp_address = (self.temp_address & 0xFFE0) | (byte >> 3) as u16;
+            self.fine_x = byte & 0x7;
             self.write_toggle = true;
         }
     }
@@ -817,6 +830,36 @@ mod tests {
     }
 
     #[test]
+    fn scroll_offset() {
+        let mut ppu = Ppu::new();
+        assert_eq!(ppu.address, 0);
+
+        ppu.write_scroll(8);
+        ppu.write_scroll(0);
+        ppu.horizontal_t2v();
+        ppu.vertical_t2v();
+
+        assert_eq!(ppu.address, 1);
+        for i in 0..31 {
+            ppu.coarse_x_increment();
+        }
+        assert_eq!(ppu.address, 0x400);
+
+        ppu.write_scroll(255);
+        ppu.write_scroll(0);
+        ppu.horizontal_t2v();
+        ppu.vertical_t2v();
+
+        assert_eq!(ppu.address, 0x1F);
+        for _ in 0..31 {
+            ppu.coarse_x_increment();
+        }
+        assert_eq!(ppu.address, 0x41E);
+
+
+    }
+
+    #[test]
     fn first_tiles() {
         let mut ppu = Ppu::new();
         ppu.write_memory(0x0010, 0xDE);
@@ -841,5 +884,23 @@ mod tests {
         assert_eq!(ppu.bg_tile_high, 0xBEEF);
     }
 
+    #[test]
+    fn full_nametable_change() {
+        let mut ppu = Ppu::new();
+        ppu.write_ppuctrl(0x01);
+        ppu.write_scroll(0);
+        ppu.write_scroll(0);
+        ppu.horizontal_t2v();
+        ppu.vertical_t2v();
+        assert_eq!(ppu.address, 0x400);
+    }
 
+    #[test]
+    fn scroll_clear_works() {
+        let mut ppu = Ppu::new();
+        ppu.temp_address = 0x041F;
+        ppu.write_scroll(0);
+        ppu.write_scroll(0);
+        assert_eq!(0x0400, ppu.temp_address);
+    }
 }

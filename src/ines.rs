@@ -74,18 +74,17 @@ impl File {
         let chr_rom_blocks = file[5];
 
         let flags6 = file[6];
-        let mirroring = if flags6 & 0x01 != 0 { Mirroring::Horizontal } else { Mirroring::Vertical };
+        let mirroring = if flags6 & 0x01 == 0 { Mirroring::Horizontal } else { Mirroring::Vertical };
+
         let trainer_present = flags6 & 0x04 != 0;
         //let four_screen_vram = flags6 & 0x08 != 0;
         let mapper = (flags6 & 0xF0) >> 4;
-
-
 
         let trainer_size = if trainer_present { 0x200 } else { 0 };
         let prg_rom_size = prg_rom_blocks as usize * 0x4000;
         let chr_rom_size = chr_rom_blocks as usize * 0x2000;
 
-
+        println!("Vertical: {}", mirroring == Mirroring::Vertical);
         println!("PRG ROM: {}", prg_rom_blocks);
         println!("CHR ROM: {}", chr_rom_blocks);
         println!("Mapper: {}", mapper);

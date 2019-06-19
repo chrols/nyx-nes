@@ -206,7 +206,7 @@ impl Cpu {
     pub fn load_game(&mut self, file: ines::File) {
         let clone = file.clone();
         self.rom = Some(mapper::new_mapper(file));
-        self.ppu.rom = Some(mapper::new_mapper(clone));
+        self.ppu.load_game(clone);
     }
 
     fn adc(&mut self, step: &Step) {

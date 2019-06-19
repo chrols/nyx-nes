@@ -29,9 +29,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let filename = &args[1];
-        let rom_file = ines::File::read(filename);
-
-        cpu.load_game(rom_file);
+        let file = ines::File::read(filename);
+        cpu.load_game(file);
         cpu.reset();
         gui::execute(&mut cpu);
     } else {
