@@ -568,7 +568,7 @@ impl Ppu {
         self.sprite_offset = (0x08 & byte) != 0;
 
         self.bg_pattern_offset = (0x10 & byte) != 0;
-        self.large_sprites = (0x02 & byte) != 0;
+        self.large_sprites = (0x20 & byte) != 0;
         self.generate_nmi = (0x80 & byte) != 0;
     }
 
