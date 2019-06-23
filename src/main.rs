@@ -1,7 +1,9 @@
 mod cpu;
-mod ines;
+mod apu;
 mod ppu;
+mod ines;
 mod gui;
+mod audio;
 mod gamepad;
 mod kevtris;
 mod mapper;

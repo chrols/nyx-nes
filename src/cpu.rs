@@ -6,6 +6,7 @@ use super::kevtris;
 use super::ppu::Ppu;
 use super::mapper::Cartridge;
 use super::mapper;
+use crate::apu::Apu;
 
 pub struct Cpu {
     a: u8,
@@ -23,6 +24,7 @@ pub struct Cpu {
     pub headless: bool, // Headless testing mode
     rom: Option<Box<Cartridge>>,
     pub ppu: Ppu,
+    pub apu: Option<Box<Apu>>,
     pub cyc: u64,
     pub gamepad: Gamepad,
 }
@@ -177,6 +179,7 @@ impl Cpu {
             headless: false,
             rom: None,
             ppu: Ppu::new(),
+            apu: None,
             cyc: 0,
             gamepad: Gamepad::new(),
         }
@@ -686,7 +689,11 @@ impl Cpu {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize],
             0x2000...0x3FFF => self.ppu.read(address),
-            0x4000...0x4015 => { 0 }, // FIXME Implement APUI
+            0x4000...0x4014 => { 0 }, // FIXME Unused?
+            0x4015 => match &mut self.apu {
+                Some(apu) => apu.read(address),
+                None => 0,
+            },
             0x4016 => { self.gamepad.read() }
             0x4017 => { 0}, // FIXME Implement gamepad 2
             0x4018...0x401F => panic!("Read from disabled registers"),
@@ -720,9 +727,9 @@ impl Cpu {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize] = byte,
             0x2000...0x3FFF => self.ppu.write(address, byte),
-            0x4000...0x4013 => (), // FIXME Implement APU
+            0x4000...0x4013 => self.apu_write(address, byte),
             0x4014 => self.oam_dma(byte),
-            0x4015 => (), // FIXME Implement APU
+            0x4015 => self.apu_write(address, byte),
             0x4016 => {
                 if (0x01 & byte) == 1 {
                     self.gamepad.start_poll();
@@ -730,12 +737,24 @@ impl Cpu {
                     self.gamepad.stop_poll();
                 }
             },
-            0x4017 => (), // FIXME Implement gamepad 2
+            0x4017 => self.apu_write(address, byte),
             0x4018...0x401F => println!("Write to disabled memory area"),
             0x4020...0xFFFF => match &mut self.rom {
                 Some(game) => game.write(address, byte),
                 None => panic!("No game loaded"),
             }
+        }
+    }
+
+    fn apu_write(&mut self, address: u16, byte: u8) {
+        assert!(address >= 0x4000);
+        assert!(address <= 0x4017);
+        assert!(address != 0x4014);
+        assert!(address != 0x4016);
+
+        match &mut self.apu {
+            Some(apu) => apu.write(address, byte),
+            None => (),
         }
     }
 
@@ -811,6 +830,12 @@ impl Cpu {
 
         for _ in 0..fluff.cycles*3 {
             self.ppu.cycle();
+        }
+
+        if let Some(apu) = &mut self.apu {
+            for _ in 0..fluff.cycles / 2 {
+                apu.cycle();
+            }
         }
 
         if self.ppu.cpu_nmi {
