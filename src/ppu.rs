@@ -152,8 +152,8 @@ pub struct Ppu {
     write_toggle: bool, // AKA w
     bg_tile_low: u16,
     bg_tile_high: u16,
-    attribute: u8,
-    attribute_latch: u8,
+    attribute_low: u16,
+    attribute_high: u16,
     fine_x: u8,
 
     another_address: u16,
@@ -195,8 +195,8 @@ impl Ppu {
             bg_tile_low: 0,
             bg_tile_high: 0,
             fine_x: 0,
-            attribute: 0,
-            attribute_latch: 0,
+            attribute_low: 0,
+            attribute_high: 0,
             oam: [0; 0x100],
             oam_addr: 0,
             vblank: Cell::new(false),
@@ -502,13 +502,22 @@ impl Ppu {
         self.bg_tile_low <<= 1;
         self.bg_tile_high <<= 1;
 
+        let attribute = if (self.attribute_low << self.fine_x & 0x8000) != 0 { 1 } else { 0 }
+            + if (self.attribute_high << self.fine_x & 0x8000) != 0 {
+                2
+            } else {
+                0
+            };
+
+        self.attribute_low <<= 1;
+        self.attribute_high <<= 1;
+
         if color == 0 {
             return None;
         }
 
         assert!(color < 4);
-
-        let palette_addr = (self.attribute as u16 * 4) + 0x3F00 + color as u16;
+        let palette_addr = (attribute as u16 * 4) + 0x3F00 + color as u16;
         Some(palette(self.read_memory(palette_addr)))
     }
 
@@ -745,8 +754,13 @@ impl Ppu {
         self.bg_tile_high = (self.bg_tile_high & 0xFF00) | (self.read_memory(tile_addr + (self.address >> 12) + 8) as u16);
         self.bg_tile_low = (self.bg_tile_low & 0xFF00) | (self.read_memory(tile_addr + (self.address >> 12)) as u16);
 
-        self.attribute = self.attribute_latch;
-        self.attribute_latch = self.attribute_byte();
+
+        self.attribute_high &= 0xFF00;
+        self.attribute_low &= 0xFF00;
+
+        let ab = self.attribute_byte();
+        self.attribute_low |= if (ab & 1) != 0 { 0x00FF } else { 0 };
+        self.attribute_high |= if (ab & 2) != 0 { 0x00FF } else { 0 };
 
         self.coarse_x_increment();
     }
@@ -756,6 +770,9 @@ impl Ppu {
             self.update_tile();
             self.bg_tile_high <<= 8;
             self.bg_tile_low <<= 8;
+            self.attribute_high <<= 8;
+            self.attribute_low <<= 8;
+
             self.update_tile();
         }
     }
