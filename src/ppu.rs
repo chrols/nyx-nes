@@ -131,7 +131,7 @@ impl OamData {
 
     fn contains_large(&self, x: u8, y: u8) -> bool {
         let x_hit = x >= self.left && x < (self.left.saturating_add(8));
-        let y_hit = y >= self.top && y < (self.top.saturating_add(8));
+        let y_hit = y >= self.top && y < (self.top.saturating_add(16));
         x_hit && y_hit
     }
 
@@ -376,11 +376,13 @@ impl Ppu {
         let tile_addr = self.tile_address_for_index(oam.index);
         let horizontal_mirror = oam.attr & 0x80 != 0;
 
-        let y_offset = if horizontal_mirror {
-            7 - (y - oam.top)
+        let y_naive_offset = if horizontal_mirror {
+            let bottom = if self.large_sprites { 15 } else { 7 };
+            bottom - (y - oam.top)
         } else {
             y - oam.top
         };
+        let y_offset =  if self.large_sprites && y_naive_offset >= 8 { y_naive_offset + 8 } else { y_naive_offset };
 
         let mut low_byte = self.read_memory(tile_addr + y_offset as u16);
         let mut high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
