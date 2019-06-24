@@ -94,7 +94,7 @@ impl SdlApu {
 
         let wave = gen_wave(48_000 * 4, duty_cycle, 48_000 / 256);
         self.device1.queue(&wave);
-        self.device1.resume();
+        //self.device1.resume();
         let length_counter_halt = (byte >> 4) & 3;
 
     }
@@ -118,7 +118,7 @@ impl SdlApu {
         };
         let wave = gen_wave(48_000 * 4, duty_cycle, 48_000 / 256);
         self.device2.queue(&wave);
-        self.device2.resume();
+        //self.device2.resume();
         let length_counter_halt = (byte >> 4) & 3;
 
     }
@@ -135,9 +135,9 @@ impl Apu for SdlApu {
     fn write(&mut self, address: u16, byte: u8) {
         match address {
             0x4000 => self.set_channel_1(byte),
-            0x4001...0x4003 => println!("{:04X} = {:04X}", address, byte),
+            0x4001...0x4003 => (), //println!("{:04X} = {:04X}", address, byte),
             0x4004 => self.set_channel_2(byte),
-            0x4005...0x4017 => println!("{:04X} = {:04X}", address, byte),
+            0x4005...0x4017 => (), //println!("{:04X} = {:04X}", address, byte),
             _ => panic!("Attempt to read from APU: {:04X}", address),
         }
 
