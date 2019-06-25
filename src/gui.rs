@@ -90,8 +90,9 @@ pub fn execute(cpu: &mut Cpu) {
     canvas.clear();
     canvas.present();
 
+    let cycle_time = Duration::new(0, 1_000_000_000u32 / 1_700_000u32);
 
-    //let tick = Instant::now();
+    let mut tick = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
 
@@ -189,12 +190,13 @@ pub fn execute(cpu: &mut Cpu) {
 
         cpu.cycle();
 
-        // if tick.elapsed() >= Duration::new(0, 1_000_000_000u32 / 10) {
-        //     tick = Instant::now();
-        //     cpu.ppu.vblank();
-        //     cpu.nmi();
-        // }
+        if cpu.cyc % 10000 == 0 {
+            let elapsed = tick.elapsed();
+            if elapsed < cycle_time * 10000 {
+                ::std::thread::sleep(cycle_time * 10000 - elapsed);
+            }
+             tick = Instant::now();
+        }
 
-        //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 1_700_000u32));
     }
 }
