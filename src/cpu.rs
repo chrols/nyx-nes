@@ -8,6 +8,9 @@ use super::mapper::Cartridge;
 use super::mapper;
 use crate::apu::Apu;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 pub struct Cpu {
     a: u8,
     x: u8,
@@ -22,7 +25,7 @@ pub struct Cpu {
     v: bool, // Overflow flag
     n: bool, // Negative flag
     pub headless: bool, // Headless testing mode
-    rom: Option<Box<Cartridge>>,
+    rom: Option<Rc<RefCell<Box<Cartridge>>>>,
     pub ppu: Ppu,
     pub apu: Option<Box<Apu>>,
     pub cyc: u64,
@@ -207,9 +210,9 @@ impl Cpu {
     }
 
     pub fn load_game(&mut self, file: ines::File) {
-        let clone = file.clone();
-        self.rom = Some(mapper::new_mapper(file));
-        self.ppu.load_game(clone);
+        let game = Rc::new(RefCell::new(mapper::new_mapper(file)));
+        self.ppu.load_game(game.clone());
+        self.rom = Some(game);
     }
 
     fn adc(&mut self, step: &Step) {
@@ -698,7 +701,7 @@ impl Cpu {
             0x4017 => { 0}, // FIXME Implement gamepad 2
             0x4018...0x401F => panic!("Read from disabled registers"),
             0x4020...0xFFFF => match &mut self.rom {
-                Some(game) => game.read(address),
+                Some(game) => game.borrow_mut().read(address),
                 None => panic!("No game loaded"),
             },
         }
@@ -740,7 +743,7 @@ impl Cpu {
             0x4017 => self.apu_write(address, byte),
             0x4018...0x401F => println!("Write to disabled memory area"),
             0x4020...0xFFFF => match &mut self.rom {
-                Some(game) => game.write(address, byte),
+                Some(game) => game.borrow_mut().write(address, byte),
                 None => panic!("No game loaded"),
             }
         }

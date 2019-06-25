@@ -1,4 +1,5 @@
 use crate::ines::File;
+use crate::ines::Mirroring;
 use super::Cartridge;
 
 pub struct UxROM {
@@ -58,5 +59,9 @@ impl Cartridge for UxROM {
             _ => panic!("PPU read outside of range: {:04X}", address),
         }
 
+    }
+
+    fn mirroring(&self) -> Mirroring {
+        self.file.mirroring
     }
 }

@@ -1,9 +1,11 @@
-use super::ines::File;
+use crate::ines::File;
+use crate::ines::Mirroring;
 
 mod nrom;
 mod mmc1;
 mod uxrom;
 mod axrom;
+mod mmc3;
 pub mod dummy;
 
 pub trait Cartridge {
@@ -11,6 +13,7 @@ pub trait Cartridge {
     fn write(&mut self, address: u16, byte: u8);
     fn ppu_read(&mut self, address: u16) -> u8;
     fn ppu_write(&mut self, address: u16, byte: u8);
+    fn mirroring(&self) -> Mirroring;
 }
 
 // pub enum Mapper {

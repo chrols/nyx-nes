@@ -1,4 +1,5 @@
 use crate::ines::File;
+use crate::ines::Mirroring;
 use super::Cartridge;
 
 pub struct DummyROM {
@@ -32,4 +33,7 @@ impl Cartridge for DummyROM {
         self.vram[address as usize % 0x2000] = byte
     }
 
+    fn mirroring(&self) -> Mirroring {
+        Mirroring::Horizontal
+    }
 }

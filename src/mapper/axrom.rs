@@ -1,4 +1,5 @@
 use crate::ines::File;
+use crate::ines::Mirroring;
 use super::Cartridge;
 
 pub struct AxROM {
@@ -45,5 +46,9 @@ impl Cartridge for AxROM {
             0x0000...0x1FFF => self.chr_ram[address as usize] = byte,
             _ => println!("Attempt to PPU write to AxROM: {:04X} = {:02X}", address, byte),
         }
+    }
+
+    fn mirroring(&self) -> Mirroring {
+        self.file.mirroring
     }
 }

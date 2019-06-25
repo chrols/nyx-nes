@@ -85,8 +85,8 @@ impl File {
         let chr_rom_size = chr_rom_blocks as usize * 0x2000;
 
         println!("Vertical: {}", mirroring == Mirroring::Vertical);
-        println!("PRG ROM: {}", prg_rom_blocks);
-        println!("CHR ROM: {}", chr_rom_blocks);
+        println!("PRG ROM: {} (16kiB)", prg_rom_blocks);
+        println!("CHR ROM: {} (8kib)", chr_rom_blocks);
         println!("Mapper: {}", mapper);
 
         let trainer_offset: usize = 0x10;

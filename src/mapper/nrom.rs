@@ -1,5 +1,6 @@
-use crate::ines::File;
 use super::Cartridge;
+use crate::ines::File;
+use crate::ines::Mirroring;
 
 pub struct NROM {
     pub file: File,
@@ -33,4 +34,7 @@ impl Cartridge for NROM {
         println!("Attempt to write to NROM: {:04X} = {:02X}", address, byte);
     }
 
+    fn mirroring(&self) -> Mirroring {
+        self.file.mirroring
+    }
 }

@@ -8,6 +8,9 @@ use crate::mapper;
 use std::cell::Cell;
 use std::panic;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -179,7 +182,7 @@ pub struct Ppu {
     pub current_cycle: usize,
     pub scanline: usize,
     pub cpu_nmi: bool,
-    pub rom: Option<Box<Cartridge>>,
+    pub rom: Option<Rc<RefCell<Box<Cartridge>>>>,
 }
 
 impl Ppu {
@@ -212,13 +215,13 @@ impl Ppu {
             bg_pattern_offset: false,
             sprite_offset: false,
             cpu_nmi: false,
-            rom: Some(DummyROM::new()),
+            rom: Some(Rc::new(RefCell::new(DummyROM::new()))),
         }
     }
 
-    pub fn load_game(&mut self, file: ines::File) {
-        self.vertical_mirroring = file.mirroring == ines::Mirroring::Vertical;
-        self.rom = Some(mapper::new_mapper(file));
+    pub fn load_game(&mut self, game: Rc<RefCell<Box<Cartridge>>>) {
+        self.vertical_mirroring = game.borrow().mirroring() == ines::Mirroring::Vertical;
+        self.rom = Some(game);
     }
 
 
@@ -636,7 +639,7 @@ impl Ppu {
     fn read_memory(&mut self, address: u16) -> u8 {
         match address {
             0x0000...0x1FFF => match &mut self.rom {
-                Some(game) => game.ppu_read(address),
+                Some(game) => game.borrow_mut().ppu_read(address),
                 None => panic!("No game loaded"),
             },
             0x2000...0x3FFF => self.vram[self.actual_vram_address(address) as usize],
@@ -647,7 +650,7 @@ impl Ppu {
     fn write_memory(&mut self, address: u16, byte: u8) {
         match address {
             0x0000...0x1FFF => match &mut self.rom {
-                Some(game) => game.ppu_write(address, byte),
+                Some(game) => game.borrow_mut().ppu_write(address, byte),
                 None => panic!("No game loaded"),
             },
             0x2000...0x3FFF => self.vram[self.actual_vram_address(address) as usize] = byte,
