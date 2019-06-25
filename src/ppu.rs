@@ -452,7 +452,7 @@ impl Ppu {
 
     fn read_oam(&self, oam_addr: usize) -> OamData {
         OamData {
-            top: self.oam[oam_addr],
+            top: self.oam[oam_addr].saturating_add(1),
             index: self.oam[oam_addr + 1],
             attr: self.oam[oam_addr + 2],
             left: self.oam[oam_addr + 3],
