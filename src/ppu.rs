@@ -168,6 +168,7 @@ pub struct Ppu {
     pub vertical_mirroring: bool,
     // Sprites
     oam: [u8; 0x100],
+    secondary_oam: [u8; 0x20],
     oam_addr: u8,
     vblank: Cell<bool>,
     sprite_zero: bool,
@@ -198,6 +199,7 @@ impl Ppu {
             attribute_low: 0,
             attribute_high: 0,
             oam: [0; 0x100],
+            secondary_oam: [0; 0x20],
             oam_addr: 0,
             vblank: Cell::new(false),
             sprite_zero: false,
@@ -320,10 +322,14 @@ impl Ppu {
                 self.update_tile();
                 self.y_increment();
             }
-            257 => self.horizontal_t2v(),
+            257 => {
+                self.horizontal_t2v();
+                self.clear_secondary_oam();
+                self.sprite_evaluation();
+            }
             258...320 => (),
             321...336 => self.prefetch(),
-            337...340 => (),
+            337...339 => (),
             _ => (),
         }
     }
@@ -464,22 +470,27 @@ impl Ppu {
         }
     }
 
+    fn read_secondary_oam(&self, oam_addr: usize) -> OamData {
+        OamData {
+            top: self.secondary_oam[oam_addr].saturating_add(1),
+            index: self.secondary_oam[oam_addr + 1],
+            attr: self.secondary_oam[oam_addr + 2],
+            left: self.secondary_oam[oam_addr + 3],
+        }
+    }
+
     fn sprite_pixel(&mut self) -> Option<Color> {
         let x = (self.current_cycle - 1) as u8;
         let y = (self.scanline) as u8;
 
-        for i in 0..64 {
-            let oam = self.read_oam(i * 4);
-
-            let contained = if self.large_sprites {
-                oam.contains_large(x, y)
-            } else {
-                oam.contains(x, y)
-            };
-
-            if contained {
-                if let Some(color) = self.sprite_color(x, y, oam) {
-                    return Some(color);
+        // Everything in secondary OAM is already is on the current line
+        for i in 0..8 {
+            let oam = self.read_secondary_oam(i * 4);
+            if let Some(column) = x.checked_sub(oam.left) {
+                if column < 8 {
+                    if let Some(color) = self.sprite_color(x, y, oam) {
+                        return Some(color);
+                    }
                 }
             }
         }
@@ -557,6 +568,39 @@ impl Ppu {
             bg_pixel
         } else {
             self.universal_bg()
+        }
+    }
+
+    fn clear_secondary_oam(&mut self) {
+        for i in 0..32 {
+            self.secondary_oam[i] = 0xFF;
+        }
+    }
+
+    /// FIXME: Not 100% accurate, does not consider sprite overflow
+    fn sprite_evaluation(&mut self) {
+        let sprite_size = if self.large_sprites { 16 } else { 8 };
+        let y = self.scanline as u8;
+
+        let mut n = 0;
+        for i in 0..64 {
+            let oi = i * 4;
+            let ni = n * 4;
+
+            let y_pos = self.oam[oi];
+            if let Some(line) = y.checked_sub(y_pos) {
+                if line < sprite_size {
+                    self.secondary_oam[ni] = self.oam[oi];
+                    self.secondary_oam[ni + 1] = self.oam[oi + 1];
+                    self.secondary_oam[ni + 2] = self.oam[oi + 2];
+                    self.secondary_oam[ni + 3] = self.oam[oi + 3];
+                    n += 1;
+                }
+            }
+
+            if n == 8 {
+                break;
+            }
         }
     }
 
