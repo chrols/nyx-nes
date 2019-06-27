@@ -839,6 +839,48 @@ mod tests {
     }
 
     #[test]
+    fn horizontal_mirroring() {
+        let mut ppu = Ppu::new();
+        ppu.vertical_mirroring = false;
+        ppu.write_memory(0x2000, 100);
+        assert_eq!(ppu.actual_vram_address(0x2000), 0x2000);
+        assert_eq!(ppu.actual_vram_address(0x2400), 0x2000);
+        assert_eq!(ppu.read_memory(0x2000), 100);
+        assert_eq!(ppu.read_memory(0x2400), 100);
+        ppu.write_memory(0x2400, 200);
+        assert_eq!(ppu.read_memory(0x2000), 200);
+        assert_eq!(ppu.read_memory(0x2400), 200);
+    }
+
+    #[test]
+    fn vertical_mirroring() {
+        let mut ppu = Ppu::new();
+        ppu.vertical_mirroring = true;
+        ppu.write_memory(0x2000, 100);
+        ppu.write_memory(0x2400, 128);
+
+        assert_eq!(ppu.actual_vram_address(0x2000), 0x2000);
+        assert_eq!(ppu.actual_vram_address(0x2800), 0x2000);
+        assert_eq!(ppu.actual_vram_address(0x2400), 0x2400);
+        assert_eq!(ppu.actual_vram_address(0x2C00), 0x2400);
+
+        assert_eq!(ppu.read_memory(0x2000), 100);
+        assert_eq!(ppu.read_memory(0x2800), 100);
+        assert_eq!(ppu.read_memory(0x2400), 128);
+        assert_eq!(ppu.read_memory(0x2C00), 128);
+
+
+        ppu.write_memory(0x2800, 200);
+        ppu.write_memory(0x2C00, 255);
+
+        assert_eq!(ppu.read_memory(0x2000), 200);
+        assert_eq!(ppu.read_memory(0x2800), 200);
+        assert_eq!(ppu.read_memory(0x2400), 255);
+        assert_eq!(ppu.read_memory(0x2C00), 255);
+    }
+
+
+    #[test]
     fn x_increment_wraparound() {
         let mut ppu = Ppu::new();
         assert_eq!(ppu.address, 0);
