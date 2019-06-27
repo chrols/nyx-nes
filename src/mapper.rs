@@ -1,12 +1,12 @@
 use crate::ines::File;
 use crate::ines::Mirroring;
 
-mod nrom;
-mod mmc1;
-mod uxrom;
 mod axrom;
-mod mmc3;
 pub mod dummy;
+mod mmc1;
+mod mmc3;
+mod nrom;
+mod uxrom;
 
 pub trait Cartridge {
     fn read(&mut self, address: u16) -> u8;

@@ -1,6 +1,6 @@
+use super::Cartridge;
 use crate::ines::File;
 use crate::ines::Mirroring;
-use super::Cartridge;
 
 pub struct DummyROM {
     vram: [u8; 0x2000],

@@ -10,7 +10,7 @@ pub struct Gamepad {
     pub left: bool,
     pub right: bool,
     byte: Cell<u8>,
-    polling: bool
+    polling: bool,
 }
 
 impl Gamepad {
@@ -30,12 +30,13 @@ impl Gamepad {
     }
 
     pub fn dump_buttons(&self) {
-        println!("{} {} {}",
-                 if self.a { "A" } else { "a" },
-                 if self.b { "B" } else { "b" },
-                 if self.start { "START" } else { "start" });
+        println!(
+            "{} {} {}",
+            if self.a { "A" } else { "a" },
+            if self.b { "B" } else { "b" },
+            if self.start { "START" } else { "start" }
+        );
     }
-
 
     pub fn start_poll(&mut self) {
         self.polling = true;
@@ -44,14 +45,30 @@ impl Gamepad {
     pub fn stop_poll(&mut self) {
         self.polling = false;
         let mut b = 0;
-        if self.a { b |= 0x01; }
-        if self.b { b |= 0x02; }
-        if self.select { b |= 0x04; }
-        if self.start { b |= 0x08; }
-        if self.up { b |= 0x10; }
-        if self.down { b |= 0x20; }
-        if self.left { b |= 0x40; }
-        if self.right { b |= 0x80; }
+        if self.a {
+            b |= 0x01;
+        }
+        if self.b {
+            b |= 0x02;
+        }
+        if self.select {
+            b |= 0x04;
+        }
+        if self.start {
+            b |= 0x08;
+        }
+        if self.up {
+            b |= 0x10;
+        }
+        if self.down {
+            b |= 0x20;
+        }
+        if self.left {
+            b |= 0x40;
+        }
+        if self.right {
+            b |= 0x80;
+        }
         self.byte.set(b);
     }
 
@@ -64,7 +81,6 @@ impl Gamepad {
             res
         }
     }
-
 }
 
 #[cfg(test)]
@@ -117,7 +133,7 @@ mod tests {
         gamepad.b = true;
         gamepad.start = true;
         gamepad.down = true;
-        gamepad.right= true;
+        gamepad.right = true;
         gamepad.start_poll();
         gamepad.stop_poll();
 

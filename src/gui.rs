@@ -1,18 +1,18 @@
 extern crate sdl2;
 
 use super::cpu::Cpu;
-use super::ppu::Ppu;
 use super::ppu;
+use super::ppu::Ppu;
 use crate::audio::SdlApu;
 
-use std::time::Instant;
 use std::time::Duration;
+use std::time::Instant;
 
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 
+use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::controller::Button;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::Canvas;
@@ -23,8 +23,8 @@ use sdl2::video::Window;
 static DISP_WIDTH: u32 = 256;
 static DISP_HEIGHT: u32 = 240;
 
-static SCREEN_W: u32 = 1024 ;
-static SCREEN_H: u32 = 960 ;
+static SCREEN_W: u32 = 1024;
+static SCREEN_H: u32 = 960;
 
 static BLOCK_W: usize = 4;
 static BLOCK_H: usize = 4;
@@ -33,7 +33,6 @@ pub struct EmulatorWindow {
     window: u32,
     canvas: u32,
 }
-
 
 fn convert_color(color: ppu::Color) -> Color {
     Color::from((color.r, color.g, color.b))
@@ -76,7 +75,10 @@ pub fn execute(cpu: &mut Cpu) {
     let sdl_apu = SdlApu::new(audio_subsystem);
     cpu.apu = Some(Box::new(sdl_apu));
 
-    println!("Game controllers: {}", controller_subsystem.num_joysticks().unwrap());
+    println!(
+        "Game controllers: {}",
+        controller_subsystem.num_joysticks().unwrap()
+    );
 
     let window = video_subsystem
         .window("RNES Emulator", SCREEN_W, SCREEN_H)
@@ -84,9 +86,8 @@ pub fn execute(cpu: &mut Cpu) {
         .build()
         .unwrap();
 
-
     let mut canvas = window.into_canvas().build().unwrap();
-    canvas.set_draw_color(Color::RGB(0,0,0));
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
     canvas.clear();
     canvas.present();
 
@@ -95,16 +96,11 @@ pub fn execute(cpu: &mut Cpu) {
     let mut tick = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
-
         if cpu.cyc % 29829 == 0 {
             for event in event_pump.poll_iter() {
-            //println!("{:?}", event);
-            match event {
-                Event::ControllerButtonDown {
-                    button,
-                    ..
-                } => {
-                    match button {
+                //println!("{:?}", event);
+                match event {
+                    Event::ControllerButtonDown { button, .. } => match button {
                         Button::DPadLeft => cpu.gamepad.left = true,
                         Button::DPadRight => cpu.gamepad.right = true,
                         Button::DPadUp => cpu.gamepad.up = true,
@@ -114,14 +110,8 @@ pub fn execute(cpu: &mut Cpu) {
                         Button::A => cpu.gamepad.a = true,
                         Button::X => cpu.gamepad.b = true,
                         _ => println!("{:?}", button),
-                    }
-
-                },
-                Event::ControllerButtonUp {
-                    button,
-                    ..
-                } => {
-                    match button {
+                    },
+                    Event::ControllerButtonUp { button, .. } => match button {
                         Button::DPadLeft => cpu.gamepad.left = false,
                         Button::DPadRight => cpu.gamepad.right = false,
                         Button::DPadUp => cpu.gamepad.up = false,
@@ -131,19 +121,15 @@ pub fn execute(cpu: &mut Cpu) {
                         Button::A => cpu.gamepad.a = false,
                         Button::X => cpu.gamepad.b = false,
                         _ => println!("{:?}", button),
-                    }
-
-                },
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
-                Event::KeyDown {
-                    keycode: Some(kc),
-                    ..
-                } => {
-                    match kc {
+                    },
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => break 'running,
+                    Event::KeyDown {
+                        keycode: Some(kc), ..
+                    } => match kc {
                         Keycode::Num1 => cpu.headless = true,
                         Keycode::Num2 => cpu.headless = false,
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
@@ -160,12 +146,10 @@ pub fn execute(cpu: &mut Cpu) {
                         Keycode::Q => cpu.gamepad.b = true,
 
                         _ => (),
-                    }
-                }
-                Event::KeyUp {
-                    keycode: Some(kc), ..
-                } => {
-                    match kc {
+                    },
+                    Event::KeyUp {
+                        keycode: Some(kc), ..
+                    } => match kc {
                         Keycode::Left => cpu.gamepad.left = false,
                         Keycode::Right => cpu.gamepad.right = false,
                         Keycode::Up => cpu.gamepad.up = false,
@@ -175,13 +159,11 @@ pub fn execute(cpu: &mut Cpu) {
                         Keycode::J => cpu.gamepad.a = false,
                         Keycode::Q => cpu.gamepad.b = false,
                         _ => (),
-                    }
+                    },
+                    _ => {}
                 }
-                _ => {}
             }
         }
-        }
-
 
         if cpu.ppu.updated {
             render(&mut canvas, &mut cpu.ppu);
@@ -195,8 +177,7 @@ pub fn execute(cpu: &mut Cpu) {
             if elapsed < cycle_time * 10000 {
                 ::std::thread::sleep(cycle_time * 10000 - elapsed);
             }
-             tick = Instant::now();
+            tick = Instant::now();
         }
-
     }
 }

@@ -1,16 +1,14 @@
 //! http://wiki.nesdev.com/w/index.php/PPU_rendering
 
-use crate::mapper::Cartridge;
-use crate::mapper::dummy::DummyROM;
 use crate::ines;
-use crate::mapper;
+use crate::mapper::dummy::DummyROM;
+use crate::mapper::Cartridge;
 
 use std::cell::Cell;
 use std::panic;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -137,7 +135,6 @@ impl OamData {
         let y_hit = y >= self.top && y < (self.top.saturating_add(16));
         x_hit && y_hit
     }
-
 }
 
 pub struct Ppu {
@@ -224,7 +221,6 @@ impl Ppu {
         self.rom = Some(game);
     }
 
-
     pub fn read(&mut self, address: u16) -> u8 {
         match address % 8 {
             1 => 0,
@@ -293,8 +289,12 @@ impl Ppu {
             1 => {
                 self.sprite_zero = false;
                 self.vblank.set(false);
-            },
-            2...255 => if self.current_cycle % 8 == 0 { self.coarse_x_increment() },
+            }
+            2...255 => {
+                if self.current_cycle % 8 == 0 {
+                    self.coarse_x_increment()
+                }
+            }
             256 => self.y_increment(),
             257 => self.horizontal_t2v(),
             258...279 => (),
@@ -314,13 +314,12 @@ impl Ppu {
                 if self.current_cycle % 8 == 0 {
                     self.update_tile();
                 }
-
-            },
+            }
             256 => {
                 self.render_pixel();
                 self.update_tile();
                 self.y_increment();
-            },
+            }
             257 => self.horizontal_t2v(),
             258...320 => (),
             321...336 => self.prefetch(),
@@ -359,7 +358,6 @@ impl Ppu {
     }
 
     fn tile_address_for_index(&self, index: u8) -> u16 {
-
         if self.large_sprites {
             Ppu::address_large_tile(index)
         } else {
@@ -385,7 +383,11 @@ impl Ppu {
         } else {
             y - oam.top
         };
-        let y_offset =  if self.large_sprites && y_naive_offset >= 8 { y_naive_offset + 8 } else { y_naive_offset };
+        let y_offset = if self.large_sprites && y_naive_offset >= 8 {
+            y_naive_offset + 8
+        } else {
+            y_naive_offset
+        };
 
         let mut low_byte = self.read_memory(tile_addr + y_offset as u16);
         let mut high_byte = self.read_memory(tile_addr + y_offset as u16 + 8);
@@ -429,7 +431,10 @@ impl Ppu {
 
     pub fn dump_internal_registers(&mut self) {
         println!("--- Internal registers ---");
-        println!("T: {:04X} X: {:02X} V: {:04X}", self.temp_address, self.fine_x, self.address);
+        println!(
+            "T: {:04X} X: {:02X} V: {:04X}",
+            self.temp_address, self.fine_x, self.address
+        );
     }
 
     pub fn dump_nametables(&mut self) {
@@ -489,7 +494,10 @@ impl Ppu {
     }
 
     fn attribute_byte(&mut self) -> u8 {
-        let attribute_address = 0x23C0 | (self.address & 0x0C00) | ((self.address >> 4) & 0x38) | ((self.address >> 2) & 0x07);
+        let attribute_address = 0x23C0
+            | (self.address & 0x0C00)
+            | ((self.address >> 4) & 0x38)
+            | ((self.address >> 2) & 0x07);
         let attribute_byte = self.read_memory(attribute_address);
         let shift = ((self.address >> 4) & 4) | (self.address & 2);
 
@@ -497,22 +505,28 @@ impl Ppu {
     }
 
     fn bg_pixel(&mut self) -> Option<Color> {
-        let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 { 1 } else { 0 }
-            + if (self.bg_tile_high << self.fine_x & 0x8000) != 0 {
-                2
-            } else {
-                0
-            };
+        let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 {
+            1
+        } else {
+            0
+        } + if (self.bg_tile_high << self.fine_x & 0x8000) != 0 {
+            2
+        } else {
+            0
+        };
 
         self.bg_tile_low <<= 1;
         self.bg_tile_high <<= 1;
 
-        let attribute = if (self.attribute_low << self.fine_x & 0x8000) != 0 { 1 } else { 0 }
-            + if (self.attribute_high << self.fine_x & 0x8000) != 0 {
-                2
-            } else {
-                0
-            };
+        let attribute = if (self.attribute_low << self.fine_x & 0x8000) != 0 {
+            1
+        } else {
+            0
+        } + if (self.attribute_high << self.fine_x & 0x8000) != 0 {
+            2
+        } else {
+            0
+        };
 
         self.attribute_low <<= 1;
         self.attribute_high <<= 1;
@@ -739,7 +753,7 @@ impl Ppu {
 
     fn horizontal_t2v(&mut self) {
         // v: ....F.. ...EDCBA = t: ....F.. ...EDCBA
-	self.address = (self.address & 0xFBE0) | (self.temp_address & 0x041F);
+        self.address = (self.address & 0xFBE0) | (self.temp_address & 0x041F);
     }
 
     fn vertical_t2v(&mut self) {
@@ -756,9 +770,10 @@ impl Ppu {
             tile_addr += 0x1000
         }
 
-        self.bg_tile_high = (self.bg_tile_high & 0xFF00) | (self.read_memory(tile_addr + (self.address >> 12) + 8) as u16);
-        self.bg_tile_low = (self.bg_tile_low & 0xFF00) | (self.read_memory(tile_addr + (self.address >> 12)) as u16);
-
+        self.bg_tile_high = (self.bg_tile_high & 0xFF00)
+            | (self.read_memory(tile_addr + (self.address >> 12) + 8) as u16);
+        self.bg_tile_low = (self.bg_tile_low & 0xFF00)
+            | (self.read_memory(tile_addr + (self.address >> 12)) as u16);
 
         self.attribute_high &= 0xFF00;
         self.attribute_low &= 0xFF00;
@@ -869,7 +884,6 @@ mod tests {
         assert_eq!(ppu.read_memory(0x2400), 128);
         assert_eq!(ppu.read_memory(0x2C00), 128);
 
-
         ppu.write_memory(0x2800, 200);
         ppu.write_memory(0x2C00, 255);
 
@@ -878,7 +892,6 @@ mod tests {
         assert_eq!(ppu.read_memory(0x2400), 255);
         assert_eq!(ppu.read_memory(0x2C00), 255);
     }
-
 
     #[test]
     fn x_increment_wraparound() {
@@ -890,7 +903,6 @@ mod tests {
         ppu.address = 31;
         ppu.coarse_x_increment();
         assert_eq!(ppu.address, 0x400);
-
     }
 
     #[test]
@@ -919,8 +931,6 @@ mod tests {
             ppu.coarse_x_increment();
         }
         assert_eq!(ppu.address, 0x41E);
-
-
     }
 
     #[test]

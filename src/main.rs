@@ -1,12 +1,12 @@
-mod cpu;
 mod apu;
-mod ppu;
-mod ines;
-mod gui;
 mod audio;
+mod cpu;
 mod gamepad;
+mod gui;
+mod ines;
 mod kevtris;
 mod mapper;
+mod ppu;
 use std::env;
 
 fn main() {

@@ -113,32 +113,34 @@ impl Cartridge for MMC1 {
     fn read(&mut self, address: u16) -> u8 {
         match address {
             0x6000...0x7FFF => self.sram[address as usize - 0x6000],
-            _ =>
-        match self.prg_rom_mode {
-            PrgRomMode::SingleBig => match address {
-                0x8000...0xFFFF => {
-                    self.file.prg_rom[address as usize - 0x8000 + self.prg_bank as usize * 0x4000]
-                }
-                _ => panic!("MMC1 Read outside of range: {:X}", address),
+            _ => match self.prg_rom_mode {
+                PrgRomMode::SingleBig => match address {
+                    0x8000...0xFFFF => {
+                        self.file.prg_rom
+                            [address as usize - 0x8000 + self.prg_bank as usize * 0x4000]
+                    }
+                    _ => panic!("MMC1 Read outside of range: {:X}", address),
+                },
+                PrgRomMode::FixedFirst => match address {
+                    0x8000...0xBFFF => self.file.prg_rom[address as usize - 0x8000],
+                    0xC000...0xFFFF => {
+                        self.file.prg_rom
+                            [address as usize - 0xC000 + self.prg_bank as usize * 0x4000]
+                    }
+                    _ => panic!("MMC1 Read outside of range: {:X}", address),
+                },
+                PrgRomMode::FixedLast => match address {
+                    0x8000...0xBFFF => {
+                        self.file.prg_rom
+                            [address as usize - 0x8000 + self.prg_bank as usize * 0x4000]
+                    }
+                    0xC000...0xFFFF => {
+                        self.file.prg_rom[address as usize - 0xC000
+                            + (self.file.prg_rom_blocks as usize - 1) * 0x4000]
+                    }
+                    _ => panic!("MMC1 Read outside of range: {:X}", address),
+                },
             },
-            PrgRomMode::FixedFirst => match address {
-                0x8000...0xBFFF => self.file.prg_rom[address as usize - 0x8000],
-                0xC000...0xFFFF => {
-                    self.file.prg_rom[address as usize - 0xC000 + self.prg_bank as usize * 0x4000]
-                }
-                _ => panic!("MMC1 Read outside of range: {:X}", address),
-            },
-            PrgRomMode::FixedLast => match address {
-                0x8000...0xBFFF => {
-                    self.file.prg_rom[address as usize - 0x8000 + self.prg_bank as usize * 0x4000]
-                }
-                0xC000...0xFFFF => {
-                    self.file.prg_rom[address as usize - 0xC000
-                        + (self.file.prg_rom_blocks as usize - 1) * 0x4000]
-                }
-                _ => panic!("MMC1 Read outside of range: {:X}", address),
-            },
-        }
         }
     }
 

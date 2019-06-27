@@ -1,12 +1,12 @@
-use std::fmt;
-use std::panic;
 use super::gamepad::Gamepad;
 use super::ines;
 use super::kevtris;
-use super::ppu::Ppu;
-use super::mapper::Cartridge;
 use super::mapper;
+use super::mapper::Cartridge;
+use super::ppu::Ppu;
 use crate::apu::Apu;
+use std::fmt;
+use std::panic;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,12 +18,12 @@ pub struct Cpu {
     pc: u16,
     sp: u8,
     ram: [u8; 0x800],
-    c: bool, // Carry flag
-    z: bool, // Zero flag
-    i: bool, // Interrupt disable
-    d: bool, // Decimal mode flag
-    v: bool, // Overflow flag
-    n: bool, // Negative flag
+    c: bool,            // Carry flag
+    z: bool,            // Zero flag
+    i: bool,            // Interrupt disable
+    d: bool,            // Decimal mode flag
+    v: bool,            // Overflow flag
+    n: bool,            // Negative flag
     pub headless: bool, // Headless testing mode
     rom: Option<Rc<RefCell<Box<Cartridge>>>>,
     pub ppu: Ppu,
@@ -197,11 +197,9 @@ impl Cpu {
         cpu.reset();
         cpu.pc = 0xC000;
 
-
         loop {
             cpu.cycle();
         }
-
     }
 
     pub fn reset(&mut self) {
@@ -400,7 +398,6 @@ impl Cpu {
         }
     }
 
-
     // Rotate right
 
     // Move each of the bits in either A or M one place to the right.
@@ -497,7 +494,6 @@ impl Cpu {
 
         self.set_zn(self.a);
 
-
         self.v = (a ^ b) & 0x80 != 0 && (a ^ self.a) & 0x80 != 0;
     }
 
@@ -523,7 +519,6 @@ impl Cpu {
         self.a = m;
         self.set_zn(m);
     }
-
 
     // Load X Register
     fn ldx(&mut self, step: &Step) {
@@ -649,14 +644,26 @@ impl Cpu {
 
     fn get_flags(&self) -> u8 {
         let mut byte = 0_u8;
-        if self.c {byte = byte | 0x01}
-        if self.z {byte = byte | 0x02}
-        if self.i {byte = byte | 0x04}
-        if self.d {byte = byte | 0x08}
+        if self.c {
+            byte = byte | 0x01
+        }
+        if self.z {
+            byte = byte | 0x02
+        }
+        if self.i {
+            byte = byte | 0x04
+        }
+        if self.d {
+            byte = byte | 0x08
+        }
         // if self.u {byte = byte | 0x10}
         byte = byte | 0x20;
-        if self.v {byte = byte | 0x40}
-        if self.n {byte = byte | 0x80}
+        if self.v {
+            byte = byte | 0x40
+        }
+        if self.n {
+            byte = byte | 0x80
+        }
         byte
     }
 
@@ -670,7 +677,6 @@ impl Cpu {
         self.v = (byte & 0x40) != 0;
         self.n = (byte & 0x80) != 0;
     }
-
 
     // Halt and catch fire
     fn hcf(&mut self, _step: &Step) {
@@ -692,13 +698,13 @@ impl Cpu {
         match address {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize],
             0x2000...0x3FFF => self.ppu.read(address),
-            0x4000...0x4014 => { 0 }, // FIXME Unused?
+            0x4000...0x4014 => 0, // FIXME Unused?
             0x4015 => match &mut self.apu {
                 Some(apu) => apu.read(address),
                 None => 0,
             },
-            0x4016 => { self.gamepad.read() }
-            0x4017 => { 0}, // FIXME Implement gamepad 2
+            0x4016 => self.gamepad.read(),
+            0x4017 => 0, // FIXME Implement gamepad 2
             0x4018...0x401F => panic!("Read from disabled registers"),
             0x4020...0xFFFF => match &mut self.rom {
                 Some(game) => game.borrow_mut().read(address),
@@ -724,7 +730,7 @@ impl Cpu {
         let high_byte = self.memory_read(b);
         low_byte as u16 | (high_byte as u16) << 8
     }
-// 	val = PEEK(PEEK((arg + X) % 256) + PEEK((arg + X + 1) % 256) * 256)
+    // 	val = PEEK(PEEK((arg + X) % 256) + PEEK((arg + X + 1) % 256) * 256)
 
     fn memory_write(&mut self, address: u16, byte: u8) {
         match address {
@@ -739,13 +745,13 @@ impl Cpu {
                 } else {
                     self.gamepad.stop_poll();
                 }
-            },
+            }
             0x4017 => self.apu_write(address, byte),
             0x4018...0x401F => println!("Write to disabled memory area"),
             0x4020...0xFFFF => match &mut self.rom {
                 Some(game) => game.borrow_mut().write(address, byte),
                 None => panic!("No game loaded"),
-            }
+            },
         }
     }
 
@@ -776,7 +782,7 @@ impl Cpu {
         self.sp = self.sp.wrapping_sub(1);
     }
 
-    fn pop(&mut self) -> u8{
+    fn pop(&mut self) -> u8 {
         self.sp += 1;
         self.memory_read(0x100 + self.sp as u16)
     }
@@ -808,7 +814,6 @@ impl Cpu {
         ((high_byte as u16) << 8) | low_byte as u16
     }
 
-
     pub fn cycle(&mut self) {
         let byte = self.memory_read(self.pc);
         let fluff = Cpu::decode(byte);
@@ -824,14 +829,13 @@ impl Cpu {
             mode: fluff.mode,
         };
 
-
         self.pc += fluff.bytes as u16;
         let exec = fluff.function;
 
         exec(self, &step);
         self.cyc += fluff.cycles as u64;
 
-        for _ in 0..fluff.cycles*3 {
+        for _ in 0..fluff.cycles * 3 {
             self.ppu.cycle();
         }
 
@@ -844,7 +848,6 @@ impl Cpu {
         if self.ppu.cpu_nmi {
             self.ppu.cpu_nmi = false;
             self.nmi();
-
         }
     }
 
@@ -857,7 +860,6 @@ impl Cpu {
 
         println!("{:04X}  {:<9} {:<31} A:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} PPU:{:3},{:3} CYC:{}", self.pc, op_bytes, format!("{:?}", op.instruction), self.a, self.x, self.y, self.get_flags(), self.sp, self.ppu.current_cycle, self.ppu.scanline, self.cyc);
     }
-
 
     fn set_zn(&mut self, value: u8) {
         self.z = value == 0;
@@ -873,7 +875,7 @@ impl Cpu {
             AddressingMode::AbsoluteX => self.x as u16 + self.read_word(self.pc + 1),
             AddressingMode::AbsoluteY => (self.y as u16).wrapping_add(self.read_word(self.pc + 1)),
             AddressingMode::ZeroPage => self.memory_read(self.pc + 1) as u16,
-            AddressingMode::ZeroPageX => self.memory_read(self.pc + 1 ).wrapping_add(self.x) as u16,
+            AddressingMode::ZeroPageX => self.memory_read(self.pc + 1).wrapping_add(self.x) as u16,
             AddressingMode::ZeroPageY => self.memory_read(self.pc + 1).wrapping_add(self.y) as u16,
             AddressingMode::Relative => {
                 let offset = self.memory_read(self.pc + 1) as u16;
@@ -882,16 +884,16 @@ impl Cpu {
                 } else {
                     self.pc + 2 + offset - 0x100
                 }
-            },
-            AddressingMode::Indirect =>  {
-                let m = self.read_word(self.pc +1);
+            }
+            AddressingMode::Indirect => {
+                let m = self.read_word(self.pc + 1);
                 self.read_word_bug(m)
             }
             AddressingMode::IndirectIndexed => {
                 let m = self.memory_read(self.pc.wrapping_add(1)) as u16;
                 self.read_word_bug(m).wrapping_add(self.y as u16)
             }
-            AddressingMode::IndexedIndirect =>  {
+            AddressingMode::IndexedIndirect => {
                 let m = self.memory_read(self.pc.wrapping_add(1));
                 let a = m.wrapping_add(self.x) as u16;
 
@@ -2698,76 +2700,58 @@ impl Cpu {
     }
 
     // ILLEGAL OpCode
-    fn ahx(&mut self, _step: &Step) {
-    }
+    fn ahx(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn alr(&mut self, _step: &Step) {
-    }
+    fn alr(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn anc(&mut self, _step: &Step) {
-    }
+    fn anc(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn arr(&mut self, _step: &Step) {
-    }
+    fn arr(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn axs(&mut self, _step: &Step) {
-    }
+    fn axs(&mut self, _step: &Step) {}
 
     // dcp OpCode
-    fn dcp(&mut self, _step: &Step) {
-    }
+    fn dcp(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn isc(&mut self, _step: &Step) {
-    }
+    fn isc(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn kil(&mut self, _step: &Step) {
-    }
+    fn kil(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn las(&mut self, _step: &Step) {
-    }
+    fn las(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn rla(&mut self, _step: &Step) {
-    }
+    fn rla(&mut self, _step: &Step) {}
 
     // rra OpCode
-    fn rra(&mut self, _step: &Step) {
-    }
+    fn rra(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn sax(&mut self, _step: &Step) {
-    }
+    fn sax(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn shx(&mut self, _step: &Step) {
-    }
+    fn shx(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn shy(&mut self, _step: &Step) {
-    }
+    fn shy(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn slo(&mut self, _step: &Step) {
-    }
+    fn slo(&mut self, _step: &Step) {}
 
     // sre OpCode
-    fn sre(&mut self, _step: &Step) {
-    }
+    fn sre(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn tas(&mut self, _step: &Step) {
-    }
+    fn tas(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn xaa(&mut self, _step: &Step) {
-    }
+    fn xaa(&mut self, _step: &Step) {}
 }
 
 #[cfg(test)]
@@ -2832,7 +2816,10 @@ mod tests {
         let mut cpu = Cpu::new();
         cpu.sp = 0xFF;
         cpu.pc = 0x1237;
-        cpu.jsr(&Step { address: 0xBEEF, mode: AddressingMode::Absolute });
+        cpu.jsr(&Step {
+            address: 0xBEEF,
+            mode: AddressingMode::Absolute,
+        });
 
         assert_eq!(cpu.pc, 0xBEEF);
         assert_eq!(cpu.sp, 0xFD);
@@ -2906,7 +2893,6 @@ mod tests {
         assert_eq!(cpu.v, true);
         assert_eq!(cpu.z, false);
 
-
         cpu.memory_write(0x1000, 0x7f);
         cpu.bit(&step);
         assert_eq!(cpu.n, false);
@@ -2923,7 +2909,7 @@ mod tests {
     #[test]
     fn sbc_zero_no_carry() {
         let mut cpu = Cpu::new();
-        let mut step =  Step::new();
+        let mut step = Step::new();
         cpu.a = 0x80;
         cpu.c = false;
         cpu.memory_write(1000, 0);
@@ -2938,7 +2924,7 @@ mod tests {
     #[test]
     fn sbc_all_with_carry() {
         let mut cpu = Cpu::new();
-        let mut step =  Step::new();
+        let mut step = Step::new();
         cpu.a = 0x40;
         cpu.c = true;
         cpu.memory_write(1000, 0x40);
@@ -2949,7 +2935,6 @@ mod tests {
         assert_eq!(cpu.n, false);
         assert_eq!(cpu.v, false);
     }
-
 
     #[test]
     fn push_pop_works() {

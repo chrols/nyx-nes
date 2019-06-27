@@ -1,14 +1,13 @@
+use sdl2::audio::{AudioCallback, AudioQueue, AudioSpecDesired};
 use sdl2::AudioSubsystem;
-use sdl2::audio::{AudioCallback, AudioSpecDesired, AudioQueue};
 
 use crate::apu::Apu;
-
 
 struct SquareWave {
     duty_cycle: f32,
     phase_inc: f32,
     phase: f32,
-    volume: f32
+    volume: f32,
 }
 
 impl AudioCallback for SquareWave {
@@ -17,7 +16,11 @@ impl AudioCallback for SquareWave {
     fn callback(&mut self, out: &mut [f32]) {
         // Generate a square wave
         for x in out.iter_mut() {
-            *x = if self.phase <= self.duty_cycle { self.volume } else { -self.volume };
+            *x = if self.phase <= self.duty_cycle {
+                self.volume
+            } else {
+                -self.volume
+            };
             self.phase = (self.phase + self.phase_inc) % 1.0;
         }
     }
@@ -37,14 +40,11 @@ fn gen_wave(bytes_to_write: i32, duty_cycle: f32, period: i32) -> Vec<i16> {
     let mut result = Vec::new();
 
     for x in 0..sample_count {
-        result.push(
-            if (x % period) <= (duty_cycle * period as f32) as i32 {
-                tone_volume
-            }
-            else {
-                -tone_volume
-            }
-        );
+        result.push(if (x % period) <= (duty_cycle * period as f32) as i32 {
+            tone_volume
+        } else {
+            -tone_volume
+        });
     }
     result
 }
@@ -53,25 +53,29 @@ impl SdlApu {
     pub fn new(audio_subsystem: AudioSubsystem) -> SdlApu {
         let desired_spec = AudioSpecDesired {
             freq: Some(44_100),
-            channels: Some(1),  // mono
-            samples: None       // default sample size
+            channels: Some(1), // mono
+            samples: None,     // default sample size
         };
 
         SdlApu {
-            pulse_channel_1:         SquareWave {
+            pulse_channel_1: SquareWave {
                 duty_cycle: 0.5,
                 phase_inc: 4400.0 / 44_100 as f32,
                 phase: 0.0,
-                volume: 0.25
+                volume: 0.25,
             },
-            pulse_channel_2:         SquareWave {
+            pulse_channel_2: SquareWave {
                 duty_cycle: 0.5,
                 phase_inc: 4400.0 / 44_100 as f32,
                 phase: 0.0,
-                volume: 0.25
+                volume: 0.25,
             },
-            device1: audio_subsystem.open_queue::<i16,_>(None, &desired_spec).unwrap(),
-            device2: audio_subsystem.open_queue::<i16,_>(None, &desired_spec).unwrap(),
+            device1: audio_subsystem
+                .open_queue::<i16, _>(None, &desired_spec)
+                .unwrap(),
+            device2: audio_subsystem
+                .open_queue::<i16, _>(None, &desired_spec)
+                .unwrap(),
         }
     }
 
@@ -90,13 +94,13 @@ impl SdlApu {
             2 => 0.5,
             3 => 0.75,
             _ => 0.0,
-        };        self.pulse_channel_1.duty_cycle = 0f32;
+        };
+        self.pulse_channel_1.duty_cycle = 0f32;
 
         let wave = gen_wave(48_000 * 4, duty_cycle, 48_000 / 256);
         self.device1.queue(&wave);
         //self.device1.resume();
         let length_counter_halt = (byte >> 4) & 3;
-
     }
 
     fn set_channel_2(&mut self, byte: u8) {
@@ -120,7 +124,6 @@ impl SdlApu {
         self.device2.queue(&wave);
         //self.device2.resume();
         let length_counter_halt = (byte >> 4) & 3;
-
     }
 }
 
@@ -145,7 +148,5 @@ impl Apu for SdlApu {
         //self.device2.resume();
     }
 
-    fn cycle(&mut self) {
-
-    }
+    fn cycle(&mut self) {}
 }

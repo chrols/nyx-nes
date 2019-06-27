@@ -1,6 +1,6 @@
+use super::Cartridge;
 use crate::ines::File;
 use crate::ines::Mirroring;
-use super::Cartridge;
 
 pub struct UxROM {
     pub file: File,
@@ -8,7 +8,6 @@ pub struct UxROM {
     chr_ram: [u8; 0x2000],
     sram: [u8; 0x2000],
 }
-
 
 impl UxROM {
     pub fn new(file: File) -> UxROM {
@@ -27,8 +26,13 @@ impl Cartridge for UxROM {
     fn read(&mut self, address: u16) -> u8 {
         match address {
             0x6000...0x7FFF => self.sram[address as usize - 0x6000],
-            0x8000...0xBFFF => self.file.prg_rom[address as usize - 0x8000 + (self.active_bank as usize) * 0x4000],
-            0xC000...0xFFFF => self.file.prg_rom[address as usize - 0xC000 + (self.file.prg_rom_blocks as usize - 1) * 0x4000],
+            0x8000...0xBFFF => {
+                self.file.prg_rom[address as usize - 0x8000 + (self.active_bank as usize) * 0x4000]
+            }
+            0xC000...0xFFFF => {
+                self.file.prg_rom
+                    [address as usize - 0xC000 + (self.file.prg_rom_blocks as usize - 1) * 0x4000]
+            }
             _ => panic!("Read outside scope: {:04X}", address),
         }
     }
@@ -37,13 +41,12 @@ impl Cartridge for UxROM {
         match address {
             0x6000...0x7FFF => self.sram[address as usize - 0x6000] = byte,
             0x8000...0xFFFF => {
-        let bank = byte & 0x0F;
-        assert!(bank <= self.file.prg_rom_blocks);
-        self.active_bank = bank;
-            },
-        _ => panic!("Write outside scope: {:04X}", address),
+                let bank = byte & 0x0F;
+                assert!(bank <= self.file.prg_rom_blocks);
+                self.active_bank = bank;
+            }
+            _ => panic!("Write outside scope: {:04X}", address),
         }
-
     }
 
     fn ppu_read(&mut self, address: u16) -> u8 {
@@ -58,7 +61,6 @@ impl Cartridge for UxROM {
             0x0000...0x1FFF => self.chr_ram[address as usize] = byte,
             _ => panic!("PPU read outside of range: {:04X}", address),
         }
-
     }
 
     fn mirroring(&self) -> Mirroring {
