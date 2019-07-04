@@ -68,17 +68,20 @@ fn render(canvas: &mut Canvas<Window>, ppu: &mut Ppu) {
 pub fn execute(cpu: &mut Cpu) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
-    let controller_subsystem = sdl_context.game_controller().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
-    let _gamepad = controller_subsystem.open(0).unwrap();
+
+    if let Ok(controller_subsystem) = sdl_context.game_controller() {
+        println!(
+            "Game controllers: {}",
+            controller_subsystem.num_joysticks().unwrap()
+        );
+
+        controller_subsystem.open(0);
+    }
 
     let sdl_apu = SdlApu::new(audio_subsystem);
     cpu.apu = Some(Box::new(sdl_apu));
 
-    println!(
-        "Game controllers: {}",
-        controller_subsystem.num_joysticks().unwrap()
-    );
 
     let window = video_subsystem
         .window("RNES Emulator", SCREEN_W, SCREEN_H)
