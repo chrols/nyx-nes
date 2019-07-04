@@ -24,7 +24,8 @@ pub struct Cpu {
     d: bool,            // Decimal mode flag
     v: bool,            // Overflow flag
     n: bool,            // Negative flag
-    pub headless: bool, // Headless testing mode
+    pub unittest: bool, // Unittest mode
+    pub tracing: bool,  // CPU tracing (slow)
     rom: Option<Rc<RefCell<Box<Cartridge>>>>,
     pub ppu: Ppu,
     pub apu: Option<Box<Apu>>,
@@ -179,7 +180,8 @@ impl Cpu {
             d: false,
             v: false,
             n: false,
-            headless: false,
+            unittest: false,
+            tracing: false,
             rom: None,
             ppu: Ppu::new(),
             apu: None,
@@ -191,7 +193,8 @@ impl Cpu {
     pub fn kevtris_nestest() {
         let nestest = ines::File::read("rom/nestest.nes");
         let mut cpu = Cpu::new();
-        cpu.headless = true;
+        cpu.tracing = true;
+        cpu.unittest = true;
         cpu.ppu.vertical_mirroring = nestest.mirroring == ines::Mirroring::Vertical;
         cpu.load_game(nestest);
         cpu.reset();
@@ -797,7 +800,7 @@ impl Cpu {
 
     fn pop_byte(&mut self) -> u8 {
         self.sp = self.sp.wrapping_add(1);
-        if self.headless && self.sp == 0xff {
+        if self.unittest && self.sp == 0xff {
             let fail1 = self.memory_read(0x02);
             let fail2 = self.memory_read(0x03);
             println!("0x02 = 0x{:02X} ({})", fail1, kevtris::translate_02(fail1));
@@ -820,7 +823,7 @@ impl Cpu {
 
         let decoded_address = self.decode_address(&fluff.mode);
 
-        if self.headless {
+        if self.tracing {
             self.print_state(&fluff);
         }
 

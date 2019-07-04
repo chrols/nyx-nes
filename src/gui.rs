@@ -133,8 +133,7 @@ pub fn execute(cpu: &mut Cpu) {
                     Event::KeyDown {
                         keycode: Some(kc), ..
                     } => match kc {
-                        Keycode::Num1 => cpu.headless = true,
-                        Keycode::Num2 => cpu.headless = false,
+                        Keycode::Num1 => cpu.tracing = !cpu.tracing,
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
                         Keycode::O => cpu.ppu.dump_oam(),
                         Keycode::E => cpu.ppu.dump_nametables(),
