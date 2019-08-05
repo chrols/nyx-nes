@@ -195,7 +195,6 @@ impl Cpu {
         let mut cpu = Cpu::new();
         cpu.tracing = true;
         cpu.unittest = true;
-        cpu.ppu.vertical_mirroring = nestest.mirroring == ines::Mirroring::Vertical;
         cpu.load_game(nestest);
         cpu.reset();
         cpu.pc = 0xC000;

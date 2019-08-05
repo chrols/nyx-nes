@@ -6,6 +6,8 @@ extern crate zip;
 pub enum Mirroring {
     Horizontal,
     Vertical,
+    SingleScreenLower,
+    SingleScreenUpper,
 }
 
 #[derive(Clone, Debug)]

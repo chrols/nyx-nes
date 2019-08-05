@@ -5,6 +5,7 @@ use crate::ines::Mirroring;
 pub struct DummyROM {
     vram: [u8; 0x2000],
     rom: [u8; 0x4000],
+    pub mirroring: Mirroring,
 }
 
 impl DummyROM {
@@ -12,6 +13,7 @@ impl DummyROM {
         Box::new(DummyROM {
             vram: [0; 0x2000],
             rom: [0; 0x4000],
+            mirroring: Mirroring::Horizontal,
         })
     }
 }
@@ -34,6 +36,6 @@ impl Cartridge for DummyROM {
     }
 
     fn mirroring(&self) -> Mirroring {
-        Mirroring::Horizontal
+        self.mirroring
     }
 }

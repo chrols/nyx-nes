@@ -4,6 +4,7 @@ use crate::ines;
 use crate::mapper::dummy::DummyROM;
 use crate::mapper::Cartridge;
 
+use ines::Mirroring;
 use std::cell::Cell;
 use std::panic;
 
@@ -165,7 +166,6 @@ pub struct Ppu {
     large_sprites: bool,
     generate_nmi: bool,
 
-    pub vertical_mirroring: bool,
     // Sprites
     oam: [u8; 0x100],
     secondary_oam: [u8; 0x20],
@@ -190,7 +190,6 @@ impl Ppu {
             another_address: 0,
             vram_increment: false,
             large_sprites: false,
-            vertical_mirroring: false,
             temp_address: 0,
             write_toggle: false,
             bg_tile_low: 0,
@@ -219,7 +218,6 @@ impl Ppu {
     }
 
     pub fn load_game(&mut self, game: Rc<RefCell<Box<Cartridge>>>) {
-        self.vertical_mirroring = game.borrow().mirroring() == ines::Mirroring::Vertical;
         self.rom = Some(game);
     }
 
@@ -717,29 +715,37 @@ impl Ppu {
     }
 
     fn actual_vram_address(&self, address: u16) -> u16 {
+        let mirroring = if let Some(game) = &self.rom {
+            game.borrow().mirroring()
+        } else {
+            Mirroring::Vertical
+        };
+
         match address {
-            0x2000...0x23FF => address,
-            0x2400...0x27FF => {
-                if self.vertical_mirroring {
-                    address
-                } else {
-                    address - 0x400
-                }
-            }
-            0x2800...0x2BFF => {
-                if self.vertical_mirroring {
-                    address - 0x800
-                } else {
-                    address
-                }
-            }
-            0x2C00...0x2FFF => {
-                if self.vertical_mirroring {
-                    address - 0x800
-                } else {
-                    address - 0x400
-                }
-            }
+            0x2000...0x23FF => match mirroring {
+                Mirroring::Vertical => address,
+                Mirroring::Horizontal => address,
+                Mirroring::SingleScreenLower => address,
+                Mirroring::SingleScreenUpper => address + 0x400,
+            },
+            0x2400...0x27FF => match mirroring {
+                Mirroring::Vertical => address,
+                Mirroring::Horizontal => address - 0x400,
+                Mirroring::SingleScreenLower => address - 0x400,
+                Mirroring::SingleScreenUpper => address,
+            },
+            0x2800...0x2BFF => match mirroring {
+                Mirroring::Vertical => address - 0x800,
+                Mirroring::Horizontal => address,
+                Mirroring::SingleScreenLower => address - 0x800,
+                Mirroring::SingleScreenUpper => address - 0x400,
+            },
+            0x2C00...0x2FFF => match mirroring {
+                Mirroring::Vertical => address - 0x800,
+                Mirroring::Horizontal => address - 0x400,
+                Mirroring::SingleScreenLower => address - 0xC00,
+                Mirroring::SingleScreenUpper => address - 0x800,
+            },
             0x3000...0x3EFF => self.actual_vram_address(address - 0x1000),
             0x3F00...0x3F0F => address,
             0x3F10 => 0x3F00,
@@ -900,7 +906,13 @@ mod tests {
     #[test]
     fn horizontal_mirroring() {
         let mut ppu = Ppu::new();
-        ppu.vertical_mirroring = false;
+
+        let mut rom = DummyROM::new();
+        rom.mirroring = Mirroring::Horizontal;
+
+        let game = Rc::new(RefCell::new(rom as Box<Cartridge>));
+        ppu.load_game(game);
+
         ppu.write_memory(0x2000, 100);
         assert_eq!(ppu.actual_vram_address(0x2000), 0x2000);
         assert_eq!(ppu.actual_vram_address(0x2400), 0x2000);
@@ -914,7 +926,13 @@ mod tests {
     #[test]
     fn vertical_mirroring() {
         let mut ppu = Ppu::new();
-        ppu.vertical_mirroring = true;
+
+        let mut rom = DummyROM::new();
+        rom.mirroring = Mirroring::Vertical;
+
+        let game = Rc::new(RefCell::new(rom as Box<Cartridge>));
+        ppu.load_game(game);
+
         ppu.write_memory(0x2000, 100);
         ppu.write_memory(0x2400, 128);
 

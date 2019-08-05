@@ -56,13 +56,13 @@ impl MMC1 {
         self.control = value;
 
         let mirroring = value & 3;
-        match mirroring {
-            0 => (),
-            1 => (),
-            2 => self.mirroring = Mirroring::Vertical,
-            3 => self.mirroring = Mirroring::Horizontal,
-            _ => (),
-        }
+        self.mirroring = match mirroring {
+            0 => Mirroring::SingleScreenLower,
+            1 => Mirroring::SingleScreenUpper,
+            2 => Mirroring::Vertical,
+            3 => Mirroring::Horizontal,
+            _ => panic!("MMC1 Impossible result"),
+        };
 
         self.prg_rom_mode = match (value >> 2) & 3 {
             0 | 1 => PrgRomMode::SingleBig,
@@ -72,20 +72,20 @@ impl MMC1 {
         };
 
         self.single_chr_rom = (0x10 & value) == 0;
-        println!("Control = {:02X}", value);
+        //println!("Control = {:02X}", value);
     }
 
     fn update_chr_bank_0(&mut self, value: u8) {
         if self.file.chr_rom_blocks == 0 {
             return;
         }
-        println!("CHR0: {:02X}", value);
+        //println!("CHR0: {:02X}", value);
         self.chr_bank_0 = if self.single_chr_rom {
             value & 0xFE
         } else {
             value
         } % (self.file.chr_rom_blocks * 2);
-        println!("CHR0: {:02X}", self.chr_bank_0);
+        //println!("CHR0: {:02X}", self.chr_bank_0);
     }
 
     fn update_chr_bank_1(&mut self, value: u8) {
@@ -93,10 +93,10 @@ impl MMC1 {
             return;
         }
 
-        println!("CHR1: {:02X}", value);
+        //println!("CHR1: {:02X}", value);
         self.chr_bank_1 = value % (self.file.chr_rom_blocks * 2);
-        println!("CHR1: {:02X}", self.chr_bank_1);
-        println!("BLOCKS: {}", self.file.chr_rom_blocks);
+        //println!("CHR1: {:02X}", self.chr_bank_1);
+        //println!("BLOCKS: {}", self.file.chr_rom_blocks);
     }
 
     fn update_prg_bank(&mut self, value: u8) {
