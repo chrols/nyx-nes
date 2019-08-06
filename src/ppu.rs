@@ -487,33 +487,31 @@ impl Ppu {
             if let Some(column) = x.checked_sub(oam.left) {
                 if column < 8 {
                     if let Some(color) = self.sprite_color(x, y, oam) {
-                        // FIXME Ordering important due to bg_pixel mutation
-                        if self.check_sprite_zero() && i == 0 {
+                        // FIXME Ordering important due to bg_pixel
+                        // mutation
+
+                        let bg_pixel = self.bg_pixel();
+
+                        // Check for sprite zero hit
+                        //
+                        // Apparently sprite zero hit cannot occur at
+                        // x=255 due to "an obscure reason related to
+                        // the pixel pipeline."
+                        if i == 0 && bg_pixel != None && x != 255 {
                             self.sprite_zero = true;
                         }
 
-                        return Some(color);
+                        return if bg_pixel != None && (0x20 & oam.attr) != 0 {
+                            bg_pixel
+                        } else {
+                            Some(color)
+                        };
                     }
                 }
             }
         }
 
         None
-    }
-
-    // Checks for sprite zero hits
-    //
-    // Foreground pixel must be non zero (i.e opaque)
-    fn check_sprite_zero(&mut self) -> bool {
-        let x = (self.current_cycle - 1) as u8;
-
-        // Apparently sprite zero hit cannot occur at x=255 due to an
-        // obscure reason related to the pixel pipeline.
-        if x == 255 {
-            return false;
-        }
-
-        self.bg_pixel() != None
     }
 
     fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
@@ -533,7 +531,7 @@ impl Ppu {
         ((attribute_byte >> shift) & 3)
     }
 
-    // FIXME MUTATES STATE!
+    // FIXME Mutates state. Make explicit?
     fn bg_pixel(&mut self) -> Option<Color> {
         let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 {
             1
