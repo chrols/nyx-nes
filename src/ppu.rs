@@ -487,6 +487,11 @@ impl Ppu {
             if let Some(column) = x.checked_sub(oam.left) {
                 if column < 8 {
                     if let Some(color) = self.sprite_color(x, y, oam) {
+                        // FIXME Ordering important due to bg_pixel mutation
+                        if self.check_sprite_zero() && i == 0 {
+                            self.sprite_zero = true;
+                        }
+
                         return Some(color);
                     }
                 }
@@ -494,6 +499,21 @@ impl Ppu {
         }
 
         None
+    }
+
+    // Checks for sprite zero hits
+    //
+    // Foreground pixel must be non zero (i.e opaque)
+    fn check_sprite_zero(&mut self) -> bool {
+        let x = (self.current_cycle - 1) as u8;
+
+        // Apparently sprite zero hit cannot occur at x=255 due to an
+        // obscure reason related to the pixel pipeline.
+        if x == 255 {
+            return false;
+        }
+
+        self.bg_pixel() != None
     }
 
     fn bytes_to_pixel(high: u8, low: u8, x: u8) -> u8 {
@@ -513,6 +533,7 @@ impl Ppu {
         ((attribute_byte >> shift) & 3)
     }
 
+    // FIXME MUTATES STATE!
     fn bg_pixel(&mut self) -> Option<Color> {
         let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 {
             1
@@ -553,14 +574,12 @@ impl Ppu {
         palette(self.read_memory(0x3F00))
     }
 
+    // Render pixel for the current "beam" position
     fn render_pixel(&mut self) {
         let x = self.current_cycle - 1;
         let y = self.scanline;
 
         self.canvas[(y * 256 + x) as usize] = if let Some(sprite_pixel) = self.sprite_pixel() {
-            if let Some(_) = self.bg_pixel() {
-                self.sprite_zero = true;
-            }
             sprite_pixel
         } else if let Some(bg_pixel) = self.bg_pixel() {
             bg_pixel
