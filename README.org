@@ -1,0 +1,10 @@
+* Nyx NES
+
+Nyx NES is my implementation of a Nintendo Entertainment System
+emulator in Rust.
+
+I have always wanted to write an emulator and I felt it would be a
+good project to learn Rust with.
+
+While it currently runs some games to some degree, it is a work in
+progress.
