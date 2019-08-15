@@ -97,6 +97,7 @@ pub fn execute(cpu: &mut Cpu) {
     let cycle_time = Duration::new(0, 1_000_000_000u32 / 1_700_000u32);
 
     let mut tick = Instant::now();
+    let mut frame_tick = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
         if cpu.cyc % 29829 == 0 {
@@ -168,18 +169,20 @@ pub fn execute(cpu: &mut Cpu) {
         }
 
         if cpu.ppu.updated {
+            let elapsed = frame_tick.elapsed();
+            if (elapsed.as_millis() > 16) {
+                println!("Frame took: {} msec", elapsed.as_millis());
+                cpu.ppu.dump();
+            } else {
+                while (frame_tick.elapsed().as_millis() < 16) {}
+            }
+
             render(&mut canvas, &mut cpu.ppu);
+            frame_tick = Instant::now();
+
             cpu.ppu.updated = false;
         }
 
         cpu.cycle();
-
-        if cpu.cyc % 10000 == 0 {
-            let elapsed = tick.elapsed();
-            if elapsed < cycle_time * 10000 {
-                ::std::thread::sleep(cycle_time * 10000 - elapsed);
-            }
-            tick = Instant::now();
-        }
     }
 }

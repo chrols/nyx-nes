@@ -282,10 +282,11 @@ impl Ppu {
     }
 
     fn prerender_scanline(&mut self) {
-        self.vblank.set(true);
-        self.updated = true;
-
         match self.current_cycle {
+            0 => {
+                self.vblank.set(true);
+                self.updated = true;
+            }
             1 => {
                 self.sprite_zero = false;
                 self.vblank.set(false);
@@ -892,6 +893,10 @@ impl Ppu {
             }
             self.address = (self.address & !0x03E0) | (y << 5); // put coarse Y back into v
         }
+    }
+
+    pub fn dump(&self) {
+        println!("Cycle: {}, Scanline: {}", self.current_cycle, self.scanline);
     }
 }
 
