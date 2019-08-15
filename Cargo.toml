@@ -1,5 +1,5 @@
 [package]
-name = "rnes"
+name = "nyx"
 version = "0.1.0"
 authors = ["Christian Olsson <chrols@chrols.se>"]
 edition = "2018"
