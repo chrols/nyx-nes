@@ -28,7 +28,7 @@ pub struct Cpu {
     pub tracing: bool,  // CPU tracing (slow)
     rom: Option<Rc<RefCell<Box<Cartridge>>>>,
     pub ppu: Ppu,
-    pub apu: Option<Box<Apu>>,
+    pub apu: Apu,
     pub cyc: u64,
     pub gamepad: Gamepad,
 }
@@ -184,7 +184,7 @@ impl Cpu {
             tracing: false,
             rom: None,
             ppu: Ppu::new(),
-            apu: None,
+            apu: Apu::new(),
             cyc: 0,
             gamepad: Gamepad::new(),
         }
@@ -701,10 +701,7 @@ impl Cpu {
             0x0000...0x1FFF => self.ram[(address % 0x800) as usize],
             0x2000...0x3FFF => self.ppu.read(address),
             0x4000...0x4014 => 0, // FIXME Unused?
-            0x4015 => match &mut self.apu {
-                Some(apu) => apu.read(address),
-                None => 0,
-            },
+            0x4015 => self.apu.read(address),
             0x4016 => self.gamepad.read(),
             0x4017 => 0, // FIXME Implement gamepad 2
             0x4018...0x401F => panic!("Read from disabled registers"),
@@ -763,10 +760,7 @@ impl Cpu {
         assert!(address != 0x4014);
         assert!(address != 0x4016);
 
-        match &mut self.apu {
-            Some(apu) => apu.write(address, byte),
-            None => (),
-        }
+        self.apu.write(address, byte)
     }
 
     fn oam_dma(&mut self, byte: u8) {
@@ -841,11 +835,7 @@ impl Cpu {
             self.ppu.cycle();
         }
 
-        if let Some(apu) = &mut self.apu {
-            for _ in 0..fluff.cycles / 2 {
-                apu.cycle();
-            }
-        }
+        self.apu.cpu_cycle();
 
         if self.ppu.cpu_nmi {
             self.ppu.cpu_nmi = false;

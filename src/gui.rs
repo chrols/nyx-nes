@@ -1,14 +1,10 @@
 extern crate sdl2;
 
-use super::cpu::Cpu;
-use super::ppu;
-use super::ppu::Ppu;
-use crate::audio::SdlApu;
+use crate::cpu::Cpu;
+use crate::ppu;
+use crate::ppu::Ppu;
 
-use std::time::Duration;
 use std::time::Instant;
-
-use sdl2::audio::{AudioCallback, AudioSpecDesired};
 
 use sdl2::controller::Button;
 use sdl2::event::Event;
@@ -77,9 +73,6 @@ pub fn execute(cpu: &mut Cpu) {
         controller_subsystem.num_joysticks().unwrap()
     );
 
-    let sdl_apu = SdlApu::new(audio_subsystem);
-    cpu.apu = Some(Box::new(sdl_apu));
-
     let window = video_subsystem
         .window("RNES Emulator", SCREEN_W, SCREEN_H)
         .position_centered()
@@ -91,9 +84,6 @@ pub fn execute(cpu: &mut Cpu) {
     canvas.clear();
     canvas.present();
 
-    let cycle_time = Duration::new(0, 1_000_000_000u32 / 1_700_000u32);
-
-    let mut tick = Instant::now();
     let mut frame_tick = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
