@@ -27,18 +27,18 @@ pub struct File {
 fn unzip(file: &Vec<u8>) -> Result<Vec<u8>, &'static str> {
     use std::io::prelude::*;
 
-    let mut reader = std::io::Cursor::new(file);
+    let reader = std::io::Cursor::new(file);
 
     let mut zip = match zip::ZipArchive::new(reader) {
         Ok(data) => data,
-        Err(error) => return Err("ZipFile error"),
+        Err(_) => return Err("ZipFile error"),
     };
 
     for i in 0..zip.len() {
-        let mut file = zip.by_index(i).unwrap();
+        let file = zip.by_index(i).unwrap();
         println!("Filename: {}", file.name());
 
-        let mut buf: Vec<u8> = file.bytes().map(|byte| byte.unwrap()).collect();
+        let buf: Vec<u8> = file.bytes().map(|byte| byte.unwrap()).collect();
 
         if File::nes_header(&buf) {
             return Ok(buf);

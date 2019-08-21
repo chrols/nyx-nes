@@ -1,5 +1,4 @@
 use super::Cartridge;
-use crate::ines::File;
 use crate::ines::Mirroring;
 
 pub struct DummyROM {
