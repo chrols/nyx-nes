@@ -1,5 +1,4 @@
 mod apu;
-mod audio;
 mod cpu;
 mod gamepad;
 mod gui;

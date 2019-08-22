@@ -6,6 +6,7 @@ use crate::ppu::Ppu;
 
 use std::time::Instant;
 
+use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -61,11 +62,31 @@ fn render(canvas: &mut Canvas<Window>, ppu: &mut Ppu) {
     canvas.present();
 }
 
+fn audio_convert(buffer: &Vec<i16>) -> Vec<i16> {
+    let mut target: Vec<i16> = Vec::new();
+    for i in buffer.iter().step_by(40) {
+        target.push(*i);
+    }
+    target
+}
+
 pub fn execute(cpu: &mut Cpu) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let audio_subsystem = sdl_context.audio().unwrap();
     let controller_subsystem = sdl_context.game_controller().unwrap();
+
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44_100),
+        channels: Some(1), // mono
+        samples: Some(4),  // default sample size
+    };
+
+    let audio_queue = audio_subsystem
+        .open_queue::<i16, _>(None, &desired_spec)
+        .unwrap();
+    audio_queue.resume();
+
     let _gamepad = controller_subsystem.open(0);
 
     println!(
@@ -157,17 +178,21 @@ pub fn execute(cpu: &mut Cpu) {
 
         if cpu.ppu.updated {
             let elapsed = frame_tick.elapsed();
-            if (elapsed.as_millis() > 16) {
+            if (elapsed.as_micros() > 16666) {
                 println!("Frame took: {} msec", elapsed.as_millis());
                 cpu.ppu.dump();
             } else {
-                while (frame_tick.elapsed().as_millis() < 16) {}
+                while (frame_tick.elapsed().as_micros() < 16666) {}
             }
 
             render(&mut canvas, &mut cpu.ppu);
             frame_tick = Instant::now();
 
             cpu.ppu.updated = false;
+            let buffer = cpu.apu.drain();
+            let wave = audio_convert(&buffer);
+
+            audio_queue.queue(&wave);
         }
 
         cpu.cycle();
