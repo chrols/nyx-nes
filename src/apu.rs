@@ -36,27 +36,22 @@ impl ApuTriangle {
     }
 
     fn write_control(&mut self, value: u8) {
-        // 0x6F 0x0110 1111
-        println!("Control: {:02X}", value);
         self.control = (value & 0x80) == 0;
         self.lc_reload_value = value & 0x7F;
     }
 
     fn write_timer_low(&mut self, value: u8) {
-        println!("Timer low: {:02X}", value);
-        self.timer_period = (0xFF00 & self.timer_value) | value as u16;
+        self.timer_period = (0xFF00 & self.timer_period) | value as u16;
     }
 
     fn write_timer_high(&mut self, value: u8) {
-        println!("Timer higher: {:02X}", value);
         self.length_counter = self.length_table[(value >> 3) as usize];
-        self.timer_period = (0x00FF & self.timer_value) | ((value as u16) << 8);
+        self.timer_period = (0x00FF & self.timer_period) | ((value as u16 & 0x3) << 8);
         self.timer_value = self.timer_period;
         self.lc_reload_flag = true;
     }
 
     fn on_linear_counter_clock(&mut self) {
-        println!("ON COUNTER!");
         if self.lc_reload_flag {
             self.lc_value = self.lc_reload_value;
         } else if self.lc_value != 0 {
@@ -69,7 +64,6 @@ impl ApuTriangle {
     }
 
     fn on_length_counter_clock(&mut self) {
-        println!("ON LENGTH!");
         if self.control && self.length_counter > 0 {
             self.length_counter -= 1;
         }

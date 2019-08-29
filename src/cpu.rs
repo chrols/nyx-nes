@@ -835,7 +835,9 @@ impl Cpu {
             self.ppu.cycle();
         }
 
-        self.apu.cpu_cycle();
+        for _ in 0..fluff.cycles {
+            self.apu.cpu_cycle();
+        }
 
         if self.ppu.cpu_nmi {
             self.ppu.cpu_nmi = false;
