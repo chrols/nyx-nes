@@ -1,3 +1,8 @@
+mod envelope;
+mod pulse;
+
+use pulse::Pulse;
+
 struct ApuTriangle {
     pos: usize,
     timer_value: u16,
@@ -51,7 +56,7 @@ impl ApuTriangle {
         self.lc_reload_flag = true;
     }
 
-    fn on_linear_counter_clock(&mut self) {
+    fn on_quarter_frame(&mut self) {
         if self.lc_reload_flag {
             self.lc_value = self.lc_reload_value;
         } else if self.lc_value != 0 {
@@ -63,7 +68,7 @@ impl ApuTriangle {
         }
     }
 
-    fn on_length_counter_clock(&mut self) {
+    fn on_half_frame(&mut self) {
         if self.control && self.length_counter > 0 {
             self.length_counter -= 1;
         }
@@ -154,9 +159,12 @@ impl FrameCounter {
 pub struct Apu {
     pulse_table: Vec<f32>,
     tnd_table: Vec<f32>,
+    pulse1: Pulse,
+    pulse2: Pulse,
     triangle: ApuTriangle,
     frame_counter: FrameCounter,
     buffer: Vec<i16>,
+    odd_cycle: bool,
 }
 
 impl Apu {
@@ -168,9 +176,12 @@ impl Apu {
             tnd_table: (0..204)
                 .map(|x| 163.67 / (24329.0 / x as f32 + 100.0))
                 .collect(),
+            pulse1: Pulse::new(),
+            pulse2: Pulse::new_channel_2(),
             triangle: ApuTriangle::new(),
             frame_counter: FrameCounter::new(),
             buffer: Vec::new(),
+            odd_cycle: false,
         }
     }
 
@@ -183,10 +194,14 @@ impl Apu {
 
     pub fn write(&mut self, address: u16, byte: u8) {
         match address {
-            0x4000 => (),          // self.set_channel_1(byte),
-            0x4001...0x4003 => (), //println!("{:04X} = {:04X}", address, byte),
-            0x4004 => (),          //self.set_channel_2(byte),
-            0x4005...0x4007 => (), //println!("{:04X} = {:04X}", address, byte),
+            0x4000 => self.pulse1.write_control(byte),
+            0x4001 => self.pulse1.write_sweep(byte),
+            0x4002 => self.pulse1.write_timer_low(byte),
+            0x4003 => self.pulse1.write_timer_high(byte),
+            0x4004 => self.pulse2.write_control(byte),
+            0x4005 => self.pulse2.write_sweep(byte),
+            0x4006 => self.pulse2.write_timer_low(byte),
+            0x4007 => self.pulse2.write_timer_high(byte),
             0x4008 => self.triangle.write_control(byte),
             0x4009 => (),
             0x400A => self.triangle.write_timer_low(byte),
@@ -200,20 +215,27 @@ impl Apu {
     }
 
     pub fn cpu_cycle(&mut self) {
+        if self.odd_cycle {
+            self.odd_cycle = false;
+            self.apu_cycle();
+        } else {
+            self.odd_cycle = true;
+        }
+
         self.triangle.cycle();
 
         let (quarter_frame, half_frame, interrupt) = self.frame_counter.cycle();
 
         if quarter_frame {
-            // FIXME Envelopes
-            // FIXME Triangle linear counter
-            self.triangle.on_linear_counter_clock();
+            self.pulse1.on_quarter_frame();
+            self.pulse2.on_quarter_frame();
+            self.triangle.on_quarter_frame();
         }
 
         if half_frame {
-            // FIXME Length counters
-            self.triangle.on_length_counter_clock();
-            // FIXME Sweep units
+            self.pulse1.on_half_frame();
+            self.pulse2.on_half_frame();
+            self.triangle.on_half_frame();
         }
 
         if interrupt {}
@@ -221,14 +243,22 @@ impl Apu {
         self.buffer.push(self.mix());
     }
 
-    fn apu_cycle(&mut self) {}
+    fn apu_cycle(&mut self) {
+        self.pulse1.on_clock();
+        self.pulse2.on_clock();
+    }
 
     fn mix(&self) -> i16 {
         // FIXME MIX MORE
         let t = self.triangle.output() as usize;
         assert!(t <= 15);
+        let pulse1 = self.pulse1.output() as usize;
+        let pulse2 = self.pulse2.output() as usize;
+        let pulse_out = self.pulse_table[pulse1 + pulse2];
+        //let tnd_out: f32 = 0.0;
         let tnd_out: f32 = self.tnd_table[t * 3];
-        let conv = (tnd_out * std::i16::MAX as f32) as i16;
+        let out = pulse_out + tnd_out;
+        let conv = (out * std::i16::MAX as f32) as i16;
         return conv;
     }
 
