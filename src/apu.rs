@@ -1,6 +1,8 @@
 mod envelope;
+mod noise;
 mod pulse;
 
+use noise::Noise;
 use pulse::Pulse;
 
 struct ApuTriangle {
@@ -162,6 +164,7 @@ pub struct Apu {
     pulse1: Pulse,
     pulse2: Pulse,
     triangle: ApuTriangle,
+    noise: Noise,
     frame_counter: FrameCounter,
     buffer: Vec<i16>,
     odd_cycle: bool,
@@ -179,6 +182,7 @@ impl Apu {
             pulse1: Pulse::new(),
             pulse2: Pulse::new_channel_2(),
             triangle: ApuTriangle::new(),
+            noise: Noise::new(),
             frame_counter: FrameCounter::new(),
             buffer: Vec::new(),
             odd_cycle: false,
@@ -206,7 +210,11 @@ impl Apu {
             0x4009 => (),
             0x400A => self.triangle.write_timer_low(byte),
             0x400B => self.triangle.write_timer_high(byte),
-            0x400C...0x4017 => (), //println!("{:04X} = {:04X}", address, byte),
+            0x400C => self.noise.write_control(byte),
+            0x400D => (),
+            0x400E => self.noise.write_mode(byte),
+            0x400F => self.noise.write_length_counter(byte),
+            0x4010...0x4017 => (), //println!("{:04X} = {:04X}", address, byte),
             _ => panic!("Attempt to write to APU: {:04X} = {:02X}", address, byte),
         }
 
@@ -229,12 +237,14 @@ impl Apu {
         if quarter_frame {
             self.pulse1.on_quarter_frame();
             self.pulse2.on_quarter_frame();
+            self.noise.on_quarter_frame();
             self.triangle.on_quarter_frame();
         }
 
         if half_frame {
             self.pulse1.on_half_frame();
             self.pulse2.on_half_frame();
+            self.noise.on_half_frame();
             self.triangle.on_half_frame();
         }
 
@@ -246,17 +256,17 @@ impl Apu {
     fn apu_cycle(&mut self) {
         self.pulse1.on_clock();
         self.pulse2.on_clock();
+        self.noise.on_clock();
     }
 
     fn mix(&self) -> i16 {
-        // FIXME MIX MORE
         let t = self.triangle.output() as usize;
+        let n = self.noise.output() as usize;
         assert!(t <= 15);
         let pulse1 = self.pulse1.output() as usize;
         let pulse2 = self.pulse2.output() as usize;
         let pulse_out = self.pulse_table[pulse1 + pulse2];
-        //let tnd_out: f32 = 0.0;
-        let tnd_out: f32 = self.tnd_table[t * 3];
+        let tnd_out: f32 = self.tnd_table[t * 3 + n * 2];
         let out = pulse_out + tnd_out;
         let conv = (out * std::i16::MAX as f32) as i16;
         return conv;

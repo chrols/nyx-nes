@@ -114,7 +114,9 @@ impl Pulse {
         }
     }
 
-    pub fn on_quarter_frame(&mut self) {}
+    pub fn on_quarter_frame(&mut self) {
+        self.envelope.on_clock();
+    }
 
     pub fn on_half_frame(&mut self) {
         if !self.length_counter_halt && self.length_counter > 0 {
