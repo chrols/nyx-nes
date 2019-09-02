@@ -160,7 +160,7 @@ impl Pulse {
     }
 
     pub fn output(&self) -> u8 {
-        if self.sweep_muted() {
+        if self.sweep_muted() || self.length_counter == 0 {
             0
         } else if self.sequencer_output() {
             self.envelope.output()
@@ -178,6 +178,7 @@ mod tests {
     fn regular_update() {
         let mut p = Pulse::new();
         let mut v: Vec<u8> = Vec::new();
+        p.length_counter = 255;
         p.envelope.set_constant_flag(true);
         p.envelope.set_v(1);
         p.timer_period = 8;
@@ -242,6 +243,7 @@ mod tests {
     #[test]
     fn output_is_envelope() {
         let mut p = Pulse::new();
+        p.length_counter = 1;
         p.timer_period = 8;
         p.envelope.set_constant_flag(true);
         p.envelope.set_v(100);
@@ -270,21 +272,22 @@ mod tests {
     #[test]
     fn length_counter_zero_no_output() {
         let mut p = Pulse::new();
+        p.length_counter = 0;
         p.envelope.set_constant_flag(true);
         p.envelope.set_v(100);
         p.current_duty = 3;
         assert_eq!(p.output(), 0);
-        assert_eq!(true, false);
     }
 
     #[test]
     fn timer_below_eight_no_output() {
         let mut p = Pulse::new();
+        p.length_counter = 1;
+        p.timer_value = 7;
         p.envelope.set_constant_flag(true);
         p.envelope.set_v(100);
         p.current_duty = 3;
         assert_eq!(p.output(), 0);
-        assert_eq!(true, false);
     }
 
     #[test]
