@@ -169,6 +169,11 @@ pub fn execute(cpu: &mut Cpu) {
         }
 
         if cpu.ppu.updated {
+            render(&mut canvas, &mut cpu.ppu);
+
+            let buffer = cpu.apu.drain();
+            audio_queue.queue(&buffer);
+
             let elapsed = frame_tick.elapsed();
             if (elapsed.as_micros() > 16666) {
                 println!("Frame took: {} msec", elapsed.as_millis());
@@ -177,12 +182,9 @@ pub fn execute(cpu: &mut Cpu) {
                 while (frame_tick.elapsed().as_micros() < 16666) {}
             }
 
-            render(&mut canvas, &mut cpu.ppu);
             frame_tick = Instant::now();
 
             cpu.ppu.updated = false;
-            let buffer = cpu.apu.drain();
-            audio_queue.queue(&buffer);
         }
 
         cpu.cycle();
