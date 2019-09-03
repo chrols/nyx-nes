@@ -158,6 +158,9 @@ impl FrameCounter {
     }
 }
 
+const NSEC_CPU_CYCLE: u64 = 1_000_000_000 / 1_789_773;
+const NSEC_SAMPLE_TIME: u64 = 1_000_000_000 / 44_100;
+
 pub struct Apu {
     pulse_table: Vec<f32>,
     tnd_table: Vec<f32>,
@@ -166,8 +169,10 @@ pub struct Apu {
     triangle: ApuTriangle,
     noise: Noise,
     frame_counter: FrameCounter,
-    buffer: Vec<i16>,
+    buffer: Vec<f32>,
     odd_cycle: bool,
+    time_next_sample: u64,
+    time_current: u64,
 }
 
 impl Apu {
@@ -186,6 +191,8 @@ impl Apu {
             frame_counter: FrameCounter::new(),
             buffer: Vec::new(),
             odd_cycle: false,
+            time_next_sample: 0,
+            time_current: 0,
         }
     }
 
@@ -249,8 +256,13 @@ impl Apu {
         }
 
         if interrupt {}
-        self.mix();
-        self.buffer.push(self.mix());
+
+        if self.time_current >= self.time_next_sample {
+            self.buffer.push(self.mix());
+            self.time_next_sample += NSEC_SAMPLE_TIME;
+        }
+
+        self.time_current += NSEC_CPU_CYCLE;
     }
 
     fn apu_cycle(&mut self) {
@@ -259,7 +271,7 @@ impl Apu {
         self.noise.on_clock();
     }
 
-    fn mix(&self) -> i16 {
+    fn mix(&self) -> f32 {
         let t = self.triangle.output() as usize;
         let n = self.noise.output() as usize;
         assert!(t <= 15);
@@ -268,11 +280,10 @@ impl Apu {
         let pulse_out = self.pulse_table[pulse1 + pulse2];
         let tnd_out: f32 = self.tnd_table[t * 3 + n * 2];
         let out = pulse_out + tnd_out;
-        let conv = (out * std::i16::MAX as f32) as i16;
-        return conv;
+        return out;
     }
 
-    pub fn drain(&mut self) -> Vec<i16> {
+    pub fn drain(&mut self) -> Vec<f32> {
         let copy = self.buffer.clone();
         self.buffer.clear();
         copy

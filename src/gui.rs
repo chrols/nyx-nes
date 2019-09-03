@@ -62,14 +62,6 @@ fn render(canvas: &mut Canvas<Window>, ppu: &mut Ppu) {
     canvas.present();
 }
 
-fn audio_convert(buffer: &Vec<i16>) -> Vec<i16> {
-    let mut target: Vec<i16> = Vec::new();
-    for i in buffer.iter().step_by(40) {
-        target.push(*i);
-    }
-    target
-}
-
 pub fn execute(cpu: &mut Cpu) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -83,7 +75,7 @@ pub fn execute(cpu: &mut Cpu) {
     };
 
     let audio_queue = audio_subsystem
-        .open_queue::<i16, _>(None, &desired_spec)
+        .open_queue::<f32, _>(None, &desired_spec)
         .unwrap();
     audio_queue.resume();
 
@@ -190,9 +182,7 @@ pub fn execute(cpu: &mut Cpu) {
 
             cpu.ppu.updated = false;
             let buffer = cpu.apu.drain();
-            let wave = audio_convert(&buffer);
-
-            audio_queue.queue(&wave);
+            audio_queue.queue(&buffer);
         }
 
         cpu.cycle();
