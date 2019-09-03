@@ -99,7 +99,7 @@ impl Pulse {
 
     pub fn write_timer_high(&mut self, byte: u8) {
         self.length_counter = self.length_table[(byte >> 3) as usize];
-        self.timer_period = (0x00FF & self.timer_period) | byte as u16;
+        self.timer_period = (0x00FF & self.timer_period) | ((byte as u16 & 0x07) << 8);
         self.timer_value = self.timer_period;
         self.envelope.set_start();
     }
