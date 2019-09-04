@@ -1,106 +1,11 @@
 mod envelope;
 mod noise;
 mod pulse;
+mod triangle;
 
 use noise::Noise;
 use pulse::Pulse;
-
-struct ApuTriangle {
-    pos: usize,
-    timer_value: u16,
-    timer_period: u16,
-    lcl: u8,
-    control: bool,
-
-    length_counter: u8,
-    length_table: Vec<u8>,
-
-    // Linear counter
-    lc_value: u8,
-    lc_reload_flag: bool,
-    lc_reload_value: u8,
-}
-
-impl ApuTriangle {
-    fn new() -> ApuTriangle {
-        ApuTriangle {
-            pos: 0,
-            timer_value: 0,
-            timer_period: 0,
-            lcl: 0,
-            control: false,
-
-            length_counter: 0,
-            length_table: vec![
-                10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48,
-                20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30,
-            ],
-
-            lc_value: 0,
-            lc_reload_flag: false,
-            lc_reload_value: 0,
-        }
-    }
-
-    fn write_control(&mut self, value: u8) {
-        self.control = (value & 0x80) == 0;
-        self.lc_reload_value = value & 0x7F;
-    }
-
-    fn write_timer_low(&mut self, value: u8) {
-        self.timer_period = (0xFF00 & self.timer_period) | value as u16;
-    }
-
-    fn write_timer_high(&mut self, value: u8) {
-        self.length_counter = self.length_table[(value >> 3) as usize];
-        self.timer_period = (0x00FF & self.timer_period) | ((value as u16 & 0x3) << 8);
-        self.timer_value = self.timer_period;
-        self.lc_reload_flag = true;
-    }
-
-    fn on_quarter_frame(&mut self) {
-        if self.lc_reload_flag {
-            self.lc_value = self.lc_reload_value;
-        } else if self.lc_value != 0 {
-            self.lc_value -= 1;
-        }
-
-        if self.control {
-            self.lc_reload_flag = false;
-        }
-    }
-
-    fn on_half_frame(&mut self) {
-        if self.control && self.length_counter > 0 {
-            self.length_counter -= 1;
-        }
-    }
-
-    fn cycle(&mut self) {
-        self.timer_value = if let Some(t) = self.timer_value.checked_sub(1) {
-            t
-        } else {
-            if self.lc_value > 0 && self.length_counter > 0 {
-                self.pos = (self.pos + 1) % 32;
-            }
-
-            self.timer_period
-        }
-    }
-
-    fn output(&self) -> u8 {
-        let triangle = [
-            15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-            11, 12, 13, 14, 15,
-        ];
-
-        if self.lc_value == 0 || self.length_counter == 0 {
-            0
-        } else {
-            triangle[self.pos]
-        }
-    }
-}
+use triangle::Triangle;
 
 struct FrameCounter {
     mode_zero: bool,
@@ -166,7 +71,7 @@ pub struct Apu {
     tnd_table: Vec<f32>,
     pulse1: Pulse,
     pulse2: Pulse,
-    triangle: ApuTriangle,
+    triangle: Triangle,
     noise: Noise,
     frame_counter: FrameCounter,
     buffer: Vec<f32>,
@@ -186,7 +91,7 @@ impl Apu {
                 .collect(),
             pulse1: Pulse::new(),
             pulse2: Pulse::new_channel_2(),
-            triangle: ApuTriangle::new(),
+            triangle: Triangle::new(),
             noise: Noise::new(),
             frame_counter: FrameCounter::new(),
             buffer: Vec::new(),
@@ -293,43 +198,6 @@ impl Apu {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn triangle_cycle() {
-        // Loop over given range and verify that it repeats
-        let triangle = [
-            15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
-            11, 12, 13, 14, 15,
-        ];
-
-        let mut tri = ApuTriangle::new();
-        tri.lc_value = 10;
-        tri.length_counter = 10;
-
-        for t in triangle.iter() {
-            assert_eq!(tri.output(), *t as u8);
-            tri.cycle();
-        }
-
-        assert_eq!(tri.output(), 15);
-    }
-
-    #[test]
-    fn triangle_period() {
-        let mut tri = ApuTriangle::new();
-        tri.lc_value = 10;
-        tri.length_counter = 10;
-
-        tri.timer_value = 2;
-        tri.timer_period = 2;
-        assert_eq!(tri.output(), 15);
-        tri.cycle();
-        assert_eq!(tri.output(), 15);
-        tri.cycle();
-        assert_eq!(tri.output(), 15);
-        tri.cycle();
-        assert_eq!(tri.output(), 14);
-    }
 
     #[test]
     fn frame_counter_four_step() {
