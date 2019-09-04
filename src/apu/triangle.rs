@@ -1,4 +1,5 @@
 pub struct Triangle {
+    pub enabled: bool,
     pos: usize,
     timer_value: u16,
     timer_period: u16,
@@ -17,6 +18,7 @@ pub struct Triangle {
 impl Triangle {
     pub fn new() -> Triangle {
         Triangle {
+            enabled: true,
             pos: 0,
             timer_value: 0,
             timer_period: 0,
@@ -88,10 +90,17 @@ impl Triangle {
             11, 12, 13, 14, 15,
         ];
 
-        if self.lc_value == 0 || self.length_counter == 0 {
+        if self.lc_value == 0 || self.length_counter == 0 || !self.enabled {
             0
         } else {
             triangle[self.pos]
+        }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        if !self.enabled {
+            self.length_counter = 0;
         }
     }
 }

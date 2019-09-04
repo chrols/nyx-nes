@@ -8,6 +8,7 @@ const DUTY_CYCLE: [[u8; 8]; 4] = [
 ];
 
 pub struct Pulse {
+    pub enabled: bool,
     envelope: Envelope,
     timer_value: u16,
     timer_period: u16,
@@ -34,6 +35,7 @@ pub struct Pulse {
 impl Pulse {
     pub fn new() -> Pulse {
         Pulse {
+            enabled: true,
             envelope: Envelope::new(),
             timer_value: 0,
             timer_period: 0,
@@ -57,6 +59,7 @@ impl Pulse {
 
     pub fn new_channel_2() -> Pulse {
         Pulse {
+            enabled: true,
             envelope: Envelope::new(),
             timer_value: 0,
             timer_period: 0,
@@ -162,12 +165,19 @@ impl Pulse {
     }
 
     pub fn output(&self) -> u8 {
-        if self.sweep_muted() || self.length_counter == 0 {
+        if self.sweep_muted() || self.length_counter == 0 || !self.enabled {
             0
         } else if self.sequencer_output() {
             self.envelope.output()
         } else {
             0
+        }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        if !self.enabled {
+            self.length_counter = 0;
         }
     }
 }

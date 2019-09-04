@@ -103,7 +103,7 @@ impl Apu {
 
     pub fn read(&mut self, address: u16) -> u8 {
         match address {
-            0x4015 => 0,
+            0x4015 => self.read_status(),
             _ => panic!("Attempt to read from APU: {:04X}", address),
         }
     }
@@ -126,12 +126,32 @@ impl Apu {
             0x400D => (),
             0x400E => self.noise.write_mode(byte),
             0x400F => self.noise.write_length_counter(byte),
-            0x4010...0x4017 => (), //println!("{:04X} = {:04X}", address, byte),
+            0x4010...0x4013 => (), //println!("{:04X} = {:04X}", address, byte),
+            0x4014 => (),
+            0x4015 => self.write_status(byte),
+            0x4017 => (),
             _ => panic!("Attempt to write to APU: {:04X} = {:02X}", address, byte),
         }
 
         //self.device1.resume();
         //self.device2.resume();
+    }
+
+    fn write_status(&mut self, byte: u8) {
+        self.pulse1.set_enabled(byte & 1 != 0);
+        self.pulse2.set_enabled(byte & 2 != 0);
+        self.triangle.set_enabled(byte & 4 != 0);
+        self.noise.set_enabled(byte & 8 != 0);
+        // self.dmc.set_enabled(byte & 0x10 != 0);
+    }
+
+    fn read_status(&mut self) -> u8 {
+        let b0 = if self.pulse1.enabled { 0x01 } else { 0 };
+        let b1 = if self.pulse2.enabled { 0x02 } else { 0 };
+        let b2 = if self.triangle.enabled { 0x04 } else { 0 };
+        let b3 = if self.noise.enabled { 0x08 } else { 0 };
+        //let b4 =  if self.dmc.enabled { 0x10 } else { 0 };
+        b0 | b1 | b2 | b3
     }
 
     pub fn cpu_cycle(&mut self) {

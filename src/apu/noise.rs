@@ -5,6 +5,7 @@ const TIMER_PERIOD: [u16; 16] = [
 ];
 
 pub struct Noise {
+    pub enabled: bool,
     envelope: Envelope,
     length_counter_halt: bool,
     length_table: Vec<u8>,
@@ -19,6 +20,7 @@ pub struct Noise {
 impl Noise {
     pub fn new() -> Noise {
         Noise {
+            enabled: true,
             envelope: Envelope::new(),
             length_counter_halt: false,
             length_table: vec![
@@ -77,12 +79,18 @@ impl Noise {
     }
 
     pub fn output(&self) -> u8 {
-        // println!("SHIFTER: {}", self.shift_register);
         let shifter_says_no = 0x0001 & self.shift_register == 0;
-        if shifter_says_no || self.length_counter == 0 {
+        if shifter_says_no || self.length_counter == 0 || !self.enabled {
             0
         } else {
             self.envelope.output()
+        }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        if !self.enabled {
+            self.length_counter = 0;
         }
     }
 }
