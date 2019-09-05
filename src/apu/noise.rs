@@ -48,6 +48,7 @@ impl Noise {
 
     pub fn write_length_counter(&mut self, byte: u8) {
         self.length_counter = self.length_table[(byte >> 3) as usize];
+        self.envelope.set_start();
     }
 
     pub fn on_clock(&mut self) {
@@ -79,7 +80,7 @@ impl Noise {
     }
 
     pub fn output(&self) -> u8 {
-        let shifter_says_no = 0x0001 & self.shift_register == 0;
+        let shifter_says_no = 0x0001 & self.shift_register == 1;
         if shifter_says_no || self.length_counter == 0 || !self.enabled {
             0
         } else {
@@ -98,8 +99,39 @@ impl Noise {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn shift_feedback_no_mode() {
-        assert_eq!(Noise::new_shift_value(1, false), 0x4000);
+        assert_eq!(Noise::new_shift_value(0x0001, false), 0x4000);
+        assert_eq!(Noise::new_shift_value(0x0003, false), 0x0001);
+
+        assert_eq!(Noise::new_shift_value(0x0001, true), 0x4000);
+        assert_eq!(Noise::new_shift_value(0x0021, true), 0x0010);
+    }
+
+    #[test]
+    fn correct_length_no_mode() {
+        let mut v = 1;
+        for i in 0..32767 {
+            v = Noise::new_shift_value(v, false);
+            if i != 32766 && v == 1 {
+                assert_ne!(v, 1);
+            }
+        }
+        assert_eq!(v, 1);
+
+    }
+
+    #[test]
+    fn correct_length_mode() {
+        let mut v = 1;
+        for i in 0..31 {
+            v = Noise::new_shift_value(v, true);
+            if i != 30 && v == 1 {
+                assert_ne!(v, 1);
+            }
+        }
+        assert_eq!(v, 1);
+
     }
 }
