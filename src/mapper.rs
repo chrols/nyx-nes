@@ -4,6 +4,7 @@ use crate::ines::Mirroring;
 mod axrom;
 pub mod dummy;
 mod mmc1;
+mod mmc3;
 mod nrom;
 mod uxrom;
 
@@ -30,6 +31,7 @@ pub fn new_mapper(file: File) -> Box<Cartridge> {
         0 => Box::new(nrom::NROM { file }),
         1 => Box::new(mmc1::MMC1::new(file)),
         2 => Box::new(uxrom::UxROM::new(file)),
+        4 => Box::new(mmc3::MMC3::new(file)),
         7 => Box::new(axrom::AxROM::new(file)),
         _ => panic!("Unimplemented mapper!"),
     }
