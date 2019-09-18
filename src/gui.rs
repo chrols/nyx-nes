@@ -172,15 +172,17 @@ pub fn execute(cpu: &mut Cpu) {
             render(&mut canvas, &mut cpu.ppu);
 
             let buffer = cpu.apu.drain();
-            audio_queue.queue(&buffer);
+
+            let delay = buffer.len() as u128 * 1_000_000 / 44_100;
 
             let elapsed = frame_tick.elapsed();
-            if (elapsed.as_micros() > 16666) {
+            if (elapsed.as_micros() > delay) {
                 println!("Frame took: {} msec", elapsed.as_millis());
                 cpu.ppu.dump();
             } else {
-                while (frame_tick.elapsed().as_micros() < 16666) {}
+                while (frame_tick.elapsed().as_micros() < delay) {}
             }
+            audio_queue.queue(&buffer);
 
             frame_tick = Instant::now();
 
