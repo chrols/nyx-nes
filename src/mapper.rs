@@ -28,7 +28,7 @@ pub trait Cartridge {
 pub fn new_mapper(file: File) -> Box<Cartridge> {
     println!("{}", file.mapper);
     match file.mapper {
-        0 => Box::new(nrom::NROM { file }),
+        0 => Box::new(nrom::NROM::new(file)),
         1 => Box::new(mmc1::MMC1::new(file)),
         2 => Box::new(uxrom::UxROM::new(file)),
         4 => Box::new(mmc3::MMC3::new(file)),
