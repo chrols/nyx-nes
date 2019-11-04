@@ -124,18 +124,6 @@ impl OamData {
             left: 0,
         }
     }
-
-    fn contains(&self, x: u8, y: u8) -> bool {
-        let x_hit = x >= self.left && x < (self.left.saturating_add(8));
-        let y_hit = y >= self.top && y < (self.top.saturating_add(8));
-        x_hit && y_hit
-    }
-
-    fn contains_large(&self, x: u8, y: u8) -> bool {
-        let x_hit = x >= self.left && x < (self.left.saturating_add(8));
-        let y_hit = y >= self.top && y < (self.top.saturating_add(16));
-        x_hit && y_hit
-    }
 }
 
 pub struct Ppu {
@@ -434,14 +422,6 @@ impl Ppu {
         self.dump_memory(0x0000, 512);
     }
 
-    pub fn dump_internal_registers(&mut self) {
-        println!("--- Internal registers ---");
-        println!(
-            "T: {:04X} X: {:02X} V: {:04X}",
-            self.temp_address, self.fine_x, self.address
-        );
-    }
-
     pub fn dump_nametables(&mut self) {
         println!("--- Name tables ---");
         self.dump_memory(0x2000, 129);
@@ -457,15 +437,6 @@ impl Ppu {
                 addr += 1;
             }
             println!("");
-        }
-    }
-
-    fn read_oam(&self, oam_addr: usize) -> OamData {
-        OamData {
-            top: self.oam[oam_addr].saturating_add(1),
-            index: self.oam[oam_addr + 1],
-            attr: self.oam[oam_addr + 2],
-            left: self.oam[oam_addr + 3],
         }
     }
 
@@ -1000,7 +971,7 @@ mod tests {
         ppu.vertical_t2v();
 
         assert_eq!(ppu.address, 1);
-        for i in 0..31 {
+        for _ in 0..31 {
             ppu.coarse_x_increment();
         }
         assert_eq!(ppu.address, 0x400);

@@ -1424,7 +1424,7 @@ impl Cpu {
                 cycles: 2,
             },
             75 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::alr,
                 instruction: Instruction::ALR,
                 mode: AddressingMode::Immediate,
                 bytes: 0,
@@ -1648,7 +1648,7 @@ impl Cpu {
                 cycles: 2,
             },
             107 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::arr,
                 instruction: Instruction::ARR,
                 mode: AddressingMode::Immediate,
                 bytes: 0,
@@ -1872,7 +1872,7 @@ impl Cpu {
                 cycles: 2,
             },
             139 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::xaa,
                 instruction: Instruction::XAA,
                 mode: AddressingMode::Immediate,
                 bytes: 0,
@@ -1984,14 +1984,14 @@ impl Cpu {
                 cycles: 2,
             },
             155 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::tas,
                 instruction: Instruction::TAS,
                 mode: AddressingMode::AbsoluteY,
                 bytes: 0,
                 cycles: 5,
             },
             156 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::shy,
                 instruction: Instruction::SHY,
                 mode: AddressingMode::AbsoluteX,
                 bytes: 0,
@@ -2005,14 +2005,14 @@ impl Cpu {
                 cycles: 5,
             },
             158 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::shx,
                 instruction: Instruction::SHX,
                 mode: AddressingMode::AbsoluteY,
                 bytes: 0,
                 cycles: 5,
             },
             159 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::ahx,
                 instruction: Instruction::AHX,
                 mode: AddressingMode::AbsoluteY,
                 bytes: 0,
@@ -2208,7 +2208,7 @@ impl Cpu {
                 cycles: 2,
             },
             187 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::las,
                 instruction: Instruction::LAS,
                 mode: AddressingMode::AbsoluteY,
                 bytes: 0,
@@ -2320,7 +2320,7 @@ impl Cpu {
                 cycles: 2,
             },
             203 => Operation {
-                function: Cpu::hcf,
+                function: Cpu::axs,
                 instruction: Instruction::AXS,
                 mode: AddressingMode::Immediate,
                 bytes: 0,
@@ -2943,11 +2943,10 @@ mod tests {
     #[test]
     fn flags_to_accumulator() {
         let mut cpu = Cpu::new();
-        let before = cpu.get_flags();
 
         cpu.set_flags(0x6f);
 
-        let mut step = Step::new();
+        let step = Step::new();
         cpu.php(&step);
         cpu.pla(&step);
         // Bit added by 'B' register logic for PHP

@@ -90,7 +90,7 @@ mod tests {
     #[test]
     #[ignore]
     fn one_is_default() {
-        let mut gamepad = Gamepad::new();
+        let gamepad = Gamepad::new();
         assert_eq!(1, gamepad.read());
     }
 

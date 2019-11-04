@@ -6,7 +6,7 @@ use crate::ppu::Ppu;
 
 use std::time::Instant;
 
-use sdl2::audio::{AudioQueue, AudioSpecDesired};
+use sdl2::audio::AudioSpecDesired;
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -25,11 +25,6 @@ static SCREEN_H: u32 = 960;
 
 static BLOCK_W: usize = 4;
 static BLOCK_H: usize = 4;
-
-pub struct EmulatorWindow {
-    window: u32,
-    canvas: u32,
-}
 
 fn convert_color(color: ppu::Color) -> Color {
     Color::from((color.r, color.g, color.b))
@@ -176,11 +171,11 @@ pub fn execute(cpu: &mut Cpu) {
             let delay = buffer.len() as u128 * 1_000_000 / 44_100;
 
             let elapsed = frame_tick.elapsed();
-            if (elapsed.as_micros() > delay) {
+            if elapsed.as_micros() > delay {
                 println!("Frame took: {} msec", elapsed.as_millis());
                 cpu.ppu.dump();
             } else {
-                while (frame_tick.elapsed().as_micros() < delay) {}
+                while frame_tick.elapsed().as_micros() < delay {}
             }
             audio_queue.queue(&buffer);
 

@@ -226,7 +226,7 @@ mod tests {
         let mut half_frames = 0;
         let mut interrupts = 0;
 
-        for i in 0..(14915 * 20) {
+        for _ in 0..(14915 * 20) {
             let (quarter_frame, half_frame, interrupt) = fc.cycle();
 
             if quarter_frame {
@@ -256,7 +256,7 @@ mod tests {
         let mut half_frames = 0;
         let mut interrupts = 0;
 
-        for i in 0..(18641 * 20) {
+        for _ in 0..(18641 * 20) {
             let (quarter_frame, half_frame, interrupt) = fc.cycle();
 
             if quarter_frame {
