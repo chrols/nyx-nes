@@ -370,6 +370,12 @@ impl Ppu {
         let tile_addr = self.tile_address_for_index(oam.index);
         let horizontal_mirror = oam.attr & 0x80 != 0;
 
+        // Should not be necessary AFAIK, but it will crash the debug
+        // build with when they are 1 > 0
+        if oam.top > y {
+            return None;
+        }
+
         let y_naive_offset = if horizontal_mirror {
             let bottom = if self.large_sprites { 15 } else { 7 };
             bottom - (y - oam.top)
