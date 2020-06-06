@@ -872,12 +872,11 @@ impl Cpu {
             AddressingMode::ZeroPageX => self.memory_read(self.pc + 1).wrapping_add(self.x) as u16,
             AddressingMode::ZeroPageY => self.memory_read(self.pc + 1).wrapping_add(self.y) as u16,
             AddressingMode::Relative => {
-                let offset = self.memory_read(self.pc + 1) as u16;
-                if offset < 0x80 {
-                    self.pc + 2 + offset
-                } else {
-                    self.pc + 2 + offset - 0x100
-                }
+                let offset = self.memory_read(self.pc + 1) as i8;
+                // 'offset as u16' will be two-complement
+                // representation so the math works out with
+                // wrapping_add
+                self.pc.wrapping_add(2 + offset as u16)
             }
             AddressingMode::Indirect => {
                 let m = self.read_word(self.pc + 1);
