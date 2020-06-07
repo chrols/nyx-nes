@@ -147,7 +147,7 @@ pub struct Ppu {
     oam: [u8; 0x100],
     secondary_oam: [u8; 0x20],
     oam_addr: u8,
-    vblank: Cell<bool>,
+    vblank: bool,
     sprite_zero: bool,
     sprite_overflow: bool,
     vram: [u8; 0x4000],
@@ -182,7 +182,7 @@ impl Ppu {
             oam: [0; 0x100],
             secondary_oam: [0; 0x20],
             oam_addr: 0,
-            vblank: Cell::new(false),
+            vblank: false,
             sprite_zero: false,
             sprite_overflow: false,
             vram: [0; 0x4000],
@@ -271,12 +271,12 @@ impl Ppu {
     fn prerender_scanline(&mut self) {
         match self.current_cycle {
             0 => {
-                self.vblank.set(true);
+                self.vblank = true;
                 self.updated = true;
             }
             1 => {
                 self.sprite_zero = false;
-                self.vblank.set(false);
+                self.vblank = false;
             }
             2...255 => {
                 if self.current_cycle % 8 == 0 {
@@ -813,18 +813,18 @@ impl Ppu {
         // w:                  = 0
         self.write_toggle = false;
 
-        let mut byte = if self.vblank.get() { 0x80 } else { 0 };
+        let mut byte = if self.vblank { 0x80 } else { 0 };
         byte |= if self.sprite_zero { 0x40 } else { 0 };
         byte |= if self.sprite_overflow { 0x20 } else { 0 };
-        self.vblank.set(false);
+        self.vblank = false;
         byte
     }
 
     pub fn vblank(&mut self) {
-        self.vblank.set(true);
         if self.generate_nmi {
             self.cpu_nmi = true;
         }
+        self.vblank = true;
     }
 
     fn horizontal_t2v(&mut self) {
