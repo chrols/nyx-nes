@@ -44,12 +44,14 @@ fn render(canvas: &mut Canvas<Window>, ppu: &mut Ppu) {
             if ppu.canvas[index] != ppu.prev_canvas[index] {
                 let fg_color = ppu.canvas[index];
                 canvas.set_draw_color(convert_color(fg_color));
-                canvas.fill_rect(Rect::new(
-                    (x * BLOCK_W) as i32,
-                    (y * BLOCK_H) as i32,
-                    BLOCK_W as u32,
-                    BLOCK_H as u32,
-                ));
+                canvas
+                    .fill_rect(Rect::new(
+                        (x * BLOCK_W) as i32,
+                        (y * BLOCK_H) as i32,
+                        BLOCK_W as u32,
+                        BLOCK_H as u32,
+                    ))
+                    .unwrap();
             }
         }
     }

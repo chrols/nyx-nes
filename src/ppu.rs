@@ -115,17 +115,6 @@ fn palette(byte: u8) -> Color {
     }
 }
 
-impl OamData {
-    fn new() -> OamData {
-        OamData {
-            top: 0,
-            index: 0,
-            attr: 0,
-            left: 0,
-        }
-    }
-}
-
 pub struct Ppu {
     // Variables corresponding to physical registers
 
