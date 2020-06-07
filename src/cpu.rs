@@ -1811,7 +1811,7 @@ impl Cpu {
                 function: Cpu::nop,
                 instruction: Instruction::NOP,
                 mode: AddressingMode::Immediate,
-                bytes: 0,
+                bytes: 1,
                 cycles: 2,
             },
             131 => Operation {
@@ -1860,7 +1860,7 @@ impl Cpu {
                 function: Cpu::nop,
                 instruction: Instruction::NOP,
                 mode: AddressingMode::Immediate,
-                bytes: 0,
+                bytes: 1,
                 cycles: 2,
             },
             138 => Operation {
@@ -2259,7 +2259,7 @@ impl Cpu {
                 function: Cpu::nop,
                 instruction: Instruction::NOP,
                 mode: AddressingMode::Immediate,
-                bytes: 0,
+                bytes: 1,
                 cycles: 2,
             },
             195 => Operation {
