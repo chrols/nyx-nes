@@ -162,6 +162,11 @@ pub struct Ppu {
     sprite_zero: bool,
     sprite_overflow: bool,
     vram: [u8; 0x4000],
+
+    show_left_bg: bool,
+    show_left_sprites: bool,
+    show_bg: bool,
+    show_sprites: bool,
     pub canvas: [Color; 256 * 240],
     pub prev_canvas: [Color; 256 * 240],
     pub updated: bool,
@@ -192,6 +197,11 @@ impl Ppu {
             sprite_zero: false,
             sprite_overflow: false,
             vram: [0; 0x4000],
+            show_left_bg: true,
+            show_left_sprites: true,
+            show_bg: true,
+            show_sprites: true,
+            data_buffer: 0,
             canvas: [Color::new(); 256 * 240],
             prev_canvas: [Color::rgb(255, 255, 255); 256 * 240],
             updated: false,
@@ -366,6 +376,8 @@ impl Ppu {
         ((index as u16) << 4) + if offset { 0x1000 } else { 0 }
     }
 
+    // Return the color for the sprite described by oam at the current
+    // beam position (if applicable).
     fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
         let tile_addr = self.tile_address_for_index(oam.index);
         let horizontal_mirror = oam.attr & 0x80 != 0;
@@ -455,9 +467,15 @@ impl Ppu {
         }
     }
 
+    // Return the color for the sprite at the current beam position
+    // (if any).
     fn sprite_pixel(&mut self) -> Option<Color> {
         let x = (self.current_cycle - 1) as u8;
         let y = (self.scanline) as u8;
+
+        if !self.show_sprites || (x < 8 && !self.show_left_sprites) {
+            return None;
+        }
 
         // Everything in secondary OAM is already is on the current line
         for i in 0..8 {
@@ -511,6 +529,10 @@ impl Ppu {
 
     // FIXME Mutates state. Make explicit?
     fn bg_pixel(&mut self) -> Option<Color> {
+        if !self.show_bg || (self.current_cycle - 1 < 8 && !self.show_left_sprites) {
+            return None;
+        }
+
         let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 {
             1
         } else {
@@ -641,7 +663,27 @@ impl Ppu {
     /// |+-------- Emphasize green
     /// +--------- Emphasize blue
     fn write_ppumask(&mut self, byte: u8) {
-        // FIXME
+        self.show_left_bg = (0x02 & byte) != 0;
+        self.show_left_sprites = (0x04 & byte) != 0;
+
+        self.show_bg = (0x08 & byte) != 0;
+        self.show_sprites = (0x10 & byte) != 0;
+
+        if (0x01 & byte) != 0 {
+            unimplemented!("Do not know how to do greyscale");
+        }
+
+        if (0x20 & byte) != 0 {
+            unimplemented!("Do not know how to emphasize red");
+        }
+
+        if (0x40 & byte) != 0 {
+            unimplemented!("Do not know how to emphasize green");
+        }
+
+        if (0x80 & byte) != 0 {
+            unimplemented!("Do not know how to emphasize blue");
+        }
     }
 
     fn write_oamdata(&mut self, byte: u8) {
