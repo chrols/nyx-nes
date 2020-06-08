@@ -1066,7 +1066,7 @@ impl Cpu {
                 function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 6,
             },
             16 => Operation {
@@ -1150,7 +1150,7 @@ impl Cpu {
                 function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             28 => Operation {
@@ -1178,7 +1178,7 @@ impl Cpu {
                 function: Cpu::slo,
                 instruction: Instruction::SLO,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             32 => Operation {
@@ -1290,7 +1290,7 @@ impl Cpu {
                 function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 6,
             },
             48 => Operation {
@@ -1374,7 +1374,7 @@ impl Cpu {
                 function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             60 => Operation {
@@ -1402,7 +1402,7 @@ impl Cpu {
                 function: Cpu::rla,
                 instruction: Instruction::RLA,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             64 => Operation {
@@ -1514,7 +1514,7 @@ impl Cpu {
                 function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 6,
             },
             80 => Operation {
@@ -1598,7 +1598,7 @@ impl Cpu {
                 function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             92 => Operation {
@@ -1626,7 +1626,7 @@ impl Cpu {
                 function: Cpu::sre,
                 instruction: Instruction::SRE,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             96 => Operation {
@@ -1738,7 +1738,7 @@ impl Cpu {
                 function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 6,
             },
             112 => Operation {
@@ -1822,7 +1822,7 @@ impl Cpu {
                 function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             124 => Operation {
@@ -1850,7 +1850,7 @@ impl Cpu {
                 function: Cpu::rra,
                 instruction: Instruction::RRA,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             128 => Operation {
@@ -1962,7 +1962,7 @@ impl Cpu {
                 function: Cpu::sax,
                 instruction: Instruction::SAX,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 4,
             },
             144 => Operation {
@@ -2186,7 +2186,7 @@ impl Cpu {
                 function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 4,
             },
             176 => Operation {
@@ -2298,7 +2298,7 @@ impl Cpu {
                 function: Cpu::lax,
                 instruction: Instruction::LAX,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 4,
             },
             192 => Operation {
@@ -2410,7 +2410,7 @@ impl Cpu {
                 function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 6,
             },
             208 => Operation {
@@ -2494,7 +2494,7 @@ impl Cpu {
                 function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             220 => Operation {
@@ -2522,7 +2522,7 @@ impl Cpu {
                 function: Cpu::dcp,
                 instruction: Instruction::DCP,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             224 => Operation {
@@ -2634,7 +2634,7 @@ impl Cpu {
                 function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::Absolute,
-                bytes: 2,
+                bytes: 3,
                 cycles: 6,
             },
             240 => Operation {
@@ -2718,7 +2718,7 @@ impl Cpu {
                 function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::AbsoluteY,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
             252 => Operation {
@@ -2746,7 +2746,7 @@ impl Cpu {
                 function: Cpu::isc,
                 instruction: Instruction::ISC,
                 mode: AddressingMode::AbsoluteX,
-                bytes: 2,
+                bytes: 3,
                 cycles: 7,
             },
         }
@@ -2768,10 +2768,17 @@ impl Cpu {
     fn axs(&mut self, _step: &Step) {}
 
     // dcp OpCode
-    fn dcp(&mut self, _step: &Step) {}
+    fn dcp(&mut self, step: &Step) {
+        self.dec(step);
+        self.cmp(step);
+    }
 
     // ILLEGAL OpCode
-    fn isc(&mut self, _step: &Step) {}
+    // AKA isb
+    fn isc(&mut self, step: &Step) {
+        self.inc(step);
+        self.sbc(step);
+    }
 
     // ILLEGAL OpCode
     fn kil(&mut self, _step: &Step) {}
@@ -2780,13 +2787,21 @@ impl Cpu {
     fn las(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn rla(&mut self, _step: &Step) {}
+    fn rla(&mut self, step: &Step) {
+        self.rol(step);
+        self.and(step);
+    }
 
     // rra OpCode
-    fn rra(&mut self, _step: &Step) {}
+    fn rra(&mut self, step: &Step) {
+        self.ror(step);
+        self.adc(step);
+    }
 
     // ILLEGAL OpCode
-    fn sax(&mut self, _step: &Step) {}
+    fn sax(&mut self, step: &Step) {
+        self.memory_write(step.address, self.a & self.x);
+    }
 
     // ILLEGAL OpCode
     fn shx(&mut self, _step: &Step) {}
@@ -2795,10 +2810,16 @@ impl Cpu {
     fn shy(&mut self, _step: &Step) {}
 
     // ILLEGAL OpCode
-    fn slo(&mut self, _step: &Step) {}
+    fn slo(&mut self, step: &Step) {
+        self.asl(step);
+        self.ora(step);
+    }
 
     // sre OpCode
-    fn sre(&mut self, _step: &Step) {}
+    fn sre(&mut self, step: &Step) {
+        self.lsr(step);
+        self.eor(step);
+    }
 
     // ILLEGAL OpCode
     fn tas(&mut self, _step: &Step) {}
