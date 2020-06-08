@@ -156,6 +156,7 @@ pub struct Ppu {
     show_left_sprites: bool,
     show_bg: bool,
     show_sprites: bool,
+    data_buffer: u8,
     pub canvas: [Color; 256 * 240],
     pub prev_canvas: [Color; 256 * 240],
     pub updated: bool,
@@ -212,12 +213,12 @@ impl Ppu {
         match address % 8 {
             1 => 0,
             2 => self.read_status(),
-            7 => {
-                let m = self.read_memory(self.another_address);
-                self.another_address = self.another_address.wrapping_add(1);
-                m
-            }
-            _ => panic!("Unimplemented register: {:X}", address % 8),
+            7 => self.read_data(),
+            _ => panic!(
+                "PPU Read: Unimplemented register: {:X} => {}",
+                address,
+                address % 8
+            ),
         }
     }
 
@@ -230,7 +231,29 @@ impl Ppu {
             5 => self.write_scroll(byte),
             6 => self.write_address(byte),
             7 => self.write_data(byte),
-            _ => panic!("Unimplemented register: {:X}", address % 8),
+            _ => panic!(
+                "PPU Write: Unimplemented register: {:X} => {}",
+                address,
+                address % 8
+            ),
+        }
+    }
+
+    // PPUDATA
+    fn read_data(&mut self) -> u8 {
+        let m = self.read_memory(self.another_address);
+
+        let increment = if self.vram_increment { 32 } else { 1 };
+        self.another_address = self.another_address.wrapping_add(increment);
+
+        if self.another_address < 0x3F00 {
+            let t = self.data_buffer;
+            self.data_buffer = m;
+            t
+        } else {
+            // Reading palette data loads a memory location "underneath" it to the read buffer
+            self.data_buffer = self.read_memory(self.another_address - increment - 0x1000);
+            m
         }
     }
 
