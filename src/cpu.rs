@@ -185,7 +185,7 @@ impl Cpu {
             rom: None,
             ppu: Ppu::new(),
             apu: Apu::new(),
-            cyc: 0,
+            cyc: 7,
             gamepad: Gamepad::new(),
         }
     }
@@ -202,6 +202,20 @@ impl Cpu {
         loop {
             cpu.cycle();
         }
+    }
+
+    // Each page is 256 bytes, if the high byte of the addresses are
+    // different we have different pages.
+    fn different_pages(page1: u16, page2: u16) -> bool {
+        page1 & 0xFF00 != page2 & 0xFF00
+    }
+
+    fn add_branch_delay(&mut self, dst_address: u16) {
+        self.cyc += if Cpu::different_pages(self.pc, dst_address) {
+            2
+        } else {
+            1
+        };
     }
 
     pub fn reset(&mut self) {
@@ -249,24 +263,24 @@ impl Cpu {
     // Branch if Carry Clear
     fn bcc(&mut self, step: &Step) {
         if self.c == false {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
     // Branch if Carry Set
     fn bcs(&mut self, step: &Step) {
         if self.c == true {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
     // Branch if Equal
     fn beq(&mut self, step: &Step) {
         if self.z {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
@@ -283,24 +297,24 @@ impl Cpu {
     // Branch if minus
     fn bmi(&mut self, step: &Step) {
         if self.n {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
     // Branch if Not Equal
     fn bne(&mut self, step: &Step) {
         if self.z == false {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
     // Branch if Positive
     fn bpl(&mut self, step: &Step) {
         if self.n == false {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
@@ -314,16 +328,16 @@ impl Cpu {
     // Branch if Overflow Clear
     fn bvc(&mut self, step: &Step) {
         if self.v == false {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
     // Branch if Overflow Set
     fn bvs(&mut self, step: &Step) {
         if self.v {
+            self.add_branch_delay(step.address);
             self.pc = step.address;
-            // FIXME Branch cycles
         }
     }
 
@@ -689,11 +703,17 @@ impl Cpu {
         self.push_word(self.pc);
         self.php(&Step::new());
         self.pc = self.read_word(0xFFFA);
+        self.i = true;
+        self.cyc += 7;
     }
 
+    // TODO: Needed by MMC4
+    #[allow(dead_code)]
     fn irq(&mut self) {
-        self.push_word(self.pc - 1);
+        self.push_word(self.pc - 1); // FIXME: Why -1?
         self.pc = self.read_word(0xFFFE);
+        self.i = true;
+        self.cyc += 7;
     }
 
     fn memory_read(&mut self, address: u16) -> u8 {
@@ -814,7 +834,7 @@ impl Cpu {
         let byte = self.memory_read(self.pc);
         let fluff = Cpu::decode(byte);
 
-        let decoded_address = self.decode_address(&fluff.mode);
+        let (decoded_address, page_crossed) = self.decode_address(&fluff.mode);
 
         if self.tracing {
             self.print_state(&fluff);
@@ -828,20 +848,44 @@ impl Cpu {
         self.pc += fluff.bytes as u16;
         let exec = fluff.function;
 
+        let old_cycles = self.cyc;
+
         exec(self, &step);
         self.cyc += fluff.cycles as u64;
 
-        for _ in 0..fluff.cycles * 3 {
-            self.ppu.cycle();
-        }
+        let page_cross_delay = match fluff.instruction {
+            Instruction::ADC
+            | Instruction::AND
+            | Instruction::CMP
+            | Instruction::EOR
+            | Instruction::LAX // Illegal
+            | Instruction::LDA
+            | Instruction::LDX
+            | Instruction::LDY
+            | Instruction::NOP
+            | Instruction::ORA
+            | Instruction::SBC => true,
+            _ => false,
+        };
 
-        for _ in 0..fluff.cycles {
-            self.apu.cpu_cycle();
+        if page_crossed && page_cross_delay {
+            self.cyc += 1;
         }
 
         if self.ppu.cpu_nmi {
             self.ppu.cpu_nmi = false;
             self.nmi();
+            self.cyc += 7;
+        }
+
+        let total_cycles = self.cyc - old_cycles;
+
+        for _ in 0..total_cycles * 3 {
+            self.ppu.cycle();
+        }
+
+        for _ in 0..total_cycles {
+            self.apu.cpu_cycle();
         }
     }
 
@@ -860,37 +904,53 @@ impl Cpu {
         self.n = (value as i8) < 0;
     }
 
-    fn decode_address(&mut self, mode: &AddressingMode) -> u16 {
+    fn decode_address(&mut self, mode: &AddressingMode) -> (u16, bool) {
         match mode {
-            AddressingMode::Accumulator => 0,
-            AddressingMode::Implied => 0,
-            AddressingMode::Immediate => self.pc + 1,
-            AddressingMode::Absolute => self.read_word(self.pc + 1),
-            AddressingMode::AbsoluteX => self.x as u16 + self.read_word(self.pc + 1),
-            AddressingMode::AbsoluteY => (self.y as u16).wrapping_add(self.read_word(self.pc + 1)),
-            AddressingMode::ZeroPage => self.memory_read(self.pc + 1) as u16,
-            AddressingMode::ZeroPageX => self.memory_read(self.pc + 1).wrapping_add(self.x) as u16,
-            AddressingMode::ZeroPageY => self.memory_read(self.pc + 1).wrapping_add(self.y) as u16,
+            AddressingMode::Accumulator => (0, false),
+            AddressingMode::Implied => (0, false),
+            AddressingMode::Immediate => (self.pc + 1, false),
+            AddressingMode::Absolute => (self.read_word(self.pc + 1), false),
+            AddressingMode::AbsoluteX => {
+                let base = self.read_word(self.pc + 1);
+                let address = base + self.x as u16;
+                (address, Cpu::different_pages(base, address))
+            }
+            AddressingMode::AbsoluteY => {
+                let base = self.read_word(self.pc + 1);
+                let address = base.wrapping_add(self.y as u16);
+                (address, Cpu::different_pages(base, address))
+            }
+            AddressingMode::ZeroPage => (self.memory_read(self.pc + 1) as u16, false),
+            AddressingMode::ZeroPageX => (
+                self.memory_read(self.pc + 1).wrapping_add(self.x) as u16,
+                false,
+            ),
+            AddressingMode::ZeroPageY => (
+                self.memory_read(self.pc + 1).wrapping_add(self.y) as u16,
+                false,
+            ),
             AddressingMode::Relative => {
                 let offset = self.memory_read(self.pc + 1) as i8;
                 // 'offset as u16' will be two-complement
                 // representation so the math works out with
                 // wrapping_add
-                self.pc.wrapping_add(2 + offset as u16)
+                (self.pc.wrapping_add(2 + offset as u16), false)
             }
             AddressingMode::Indirect => {
                 let m = self.read_word(self.pc + 1);
-                self.read_word_bug(m)
+                (self.read_word_bug(m), false)
             }
             AddressingMode::IndirectIndexed => {
                 let m = self.memory_read(self.pc.wrapping_add(1)) as u16;
-                self.read_word_bug(m).wrapping_add(self.y as u16)
+                let base = self.read_word_bug(m);
+                let address = base.wrapping_add(self.y as u16);
+                (address, Cpu::different_pages(base, address))
             }
             AddressingMode::IndexedIndirect => {
                 let m = self.memory_read(self.pc.wrapping_add(1));
                 let a = m.wrapping_add(self.x) as u16;
 
-                self.read_word_bug(a)
+                (self.read_word_bug(a), false)
             }
         }
     }
@@ -2980,7 +3040,7 @@ mod tests {
 
         let mut step = Step::new();
         step.mode = AddressingMode::AbsoluteX;
-        step.address = cpu.decode_address(&step.mode);
+        step.address = cpu.decode_address(&step.mode).0;
         assert_eq!(step.address, 0x0655);
 
         cpu.a = 0x01;
@@ -3018,7 +3078,7 @@ mod tests {
 
         let mut step = Step::new();
         step.mode = AddressingMode::IndexedIndirect;
-        step.address = cpu.decode_address(&step.mode);
+        step.address = cpu.decode_address(&step.mode).0;
         assert_eq!(step.address, 0x1000);
 
         cpu.lda(&step);
