@@ -4,6 +4,7 @@ use crate::ines::Mirroring;
 
 pub struct NROM {
     pub file: File,
+    sram: [u8; 0x2000],
     chr_ram: [u8; 0x2000],
 }
 
@@ -11,6 +12,7 @@ impl NROM {
     pub fn new(file: File) -> NROM {
         NROM {
             file,
+            sram: [0; 0x2000],
             chr_ram: [0; 0x2000],
         }
     }
@@ -18,19 +20,26 @@ impl NROM {
 
 impl Cartridge for NROM {
     fn read(&mut self, address: u16) -> u8 {
-        let mut ram_address = address - 0x8000;
-        if self.file.prg_rom_blocks == 1 {
-            ram_address %= 0x4000;
-        }
-
         match address {
-            0x4020...0xFFFF => self.file.prg_rom[ram_address as usize],
-            _ => panic!("Read outside scope: {:04X}", address),
+            0x4020...0x5FFF => panic!("Read in unused ROM region? {:X}", address),
+            0x6000...0x7FFF => self.file.prg_rom[address as usize - 0x6000],
+            0x8000...0xFFFF => {
+                self.file.prg_rom[(address as usize - 0x8000)
+                    % if self.file.prg_rom_blocks == 1 {
+                        0x4000
+                    } else {
+                        0x8000
+                    }]
+            }
+            _ => panic!("NROM Read outside ROM region: {:X}", address),
         }
     }
 
     fn write(&mut self, address: u16, byte: u8) {
-        println!("Attempt to write to NROM: {:04X} = {:02X}", address, byte);
+        match address {
+            0x6000...0x7FFF => self.sram[(address as usize - 0x6000) % 0x2000] = byte,
+            _ => panic!("Attempt to write to NROM: {:04X} = {:02X}", address, byte),
+        }
     }
 
     fn ppu_read(&mut self, address: u16) -> u8 {
@@ -48,7 +57,10 @@ impl Cartridge for NROM {
         if self.file.chr_rom_blocks == 0 {
             self.chr_ram[address as usize] = byte;
         } else {
-            println!("Attempt to write to NROM: {:04X} = {:02X}", address, byte);
+            println!(
+                "PPU: Attempt to write to NROM: {:04X} = {:02X}",
+                address, byte
+            );
         }
     }
 
