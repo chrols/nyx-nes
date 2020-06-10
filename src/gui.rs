@@ -95,9 +95,14 @@ pub fn execute(cpu: &mut Cpu) {
     canvas.present();
 
     let mut frame_tick = Instant::now();
+    let mut input_poll = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
     'running: loop {
-        if cpu.cyc % 29829 == 0 {
+        let msec_since_poll = input_poll.elapsed().as_millis();
+        // Approx 16 ms between frames
+        if msec_since_poll > 16 {
+            input_poll = Instant::now();
+
             for event in event_pump.poll_iter() {
                 //println!("{:?}", event);
                 match event {
