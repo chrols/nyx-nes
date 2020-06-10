@@ -6,6 +6,7 @@ pub struct MMC3 {
     pub file: File,
     mirroring: Mirroring,
     chr_inversion: bool,
+    prg_ram: [u8; 0x2000],
     prg_bank_mode: bool,
     prg_offset: [usize; 4],
     chr_offset: [usize; 8],
@@ -21,6 +22,7 @@ impl MMC3 {
             mirroring: file.mirroring,
             file,
             chr_inversion: false,
+            prg_ram: [0; 0x2000],
             prg_bank_mode: false,
             prg_offset: [0, 0, prg_next_to_last, prg_last_block],
             chr_offset: [0, 1, 2, 3, 4, 5, 6, 7],
@@ -131,6 +133,10 @@ impl MMC3 {
 
 impl Cartridge for MMC3 {
     fn read(&mut self, address: u16) -> u8 {
+        if address >= 0x6000 && address <= 0x7FFF {
+            return self.prg_ram[address as usize - 0x6000];
+        }
+
         let prg_addr = match address {
             0x8000...0x9FFF => self.prg_offset[0],
             0xA000...0xBFFF => self.prg_offset[1],
@@ -148,6 +154,7 @@ impl Cartridge for MMC3 {
 
     fn write(&mut self, address: u16, byte: u8) {
         match address {
+            0x6000...0x7FFF => self.prg_ram[address as usize - 0x6000] = byte,
             0x8000...0x9FFF if address % 2 == 0 => self.bank_select(byte),
             0x8000...0x9FFF => self.bank_data(byte),
             0xA000...0xBFFF if address % 2 == 0 => self.set_mirroring(byte),
