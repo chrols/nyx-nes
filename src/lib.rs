@@ -7,3 +7,4 @@ mod apu;
 mod gamepad;
 mod kevtris;
 mod mapper;
+mod png;

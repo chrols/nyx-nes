@@ -5,6 +5,7 @@ mod gui;
 mod ines;
 mod kevtris;
 mod mapper;
+mod png;
 mod ppu;
 use std::env;
 

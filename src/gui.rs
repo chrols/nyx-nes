@@ -1,6 +1,7 @@
 extern crate sdl2;
 
 use crate::cpu::Cpu;
+use crate::png;
 use crate::ppu;
 use crate::ppu::Ppu;
 
@@ -17,14 +18,16 @@ use sdl2::video::Window;
 
 // 256 * 240
 
-static DISP_WIDTH: u32 = 256;
-static DISP_HEIGHT: u32 = 240;
+pub static DISP_WIDTH: u32 = 256;
+pub static DISP_HEIGHT: u32 = 240;
 
-static SCREEN_W: u32 = 1024;
-static SCREEN_H: u32 = 960;
+// Pixel aspect ratio is supposed to be 8:7?
 
-static BLOCK_W: usize = 4;
-static BLOCK_H: usize = 4;
+static BLOCK_W: usize = 6;
+static BLOCK_H: usize = 5;
+
+static SCREEN_W: u32 = DISP_WIDTH * BLOCK_W as u32;
+static SCREEN_H: u32 = DISP_HEIGHT * BLOCK_H as u32;
 
 fn convert_color(color: ppu::Color) -> Color {
     Color::from((color.r, color.g, color.b))
@@ -137,6 +140,7 @@ pub fn execute(cpu: &mut Cpu) {
                         keycode: Some(kc), ..
                     } => match kc {
                         Keycode::Num1 => cpu.tracing = !cpu.tracing,
+                        Keycode::Num2 => super::png::write_png_frame(&cpu.ppu),
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
                         Keycode::O => cpu.ppu.dump_oam(),
                         Keycode::E => cpu.ppu.dump_nametables(),
