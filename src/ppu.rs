@@ -525,7 +525,7 @@ impl Ppu {
                         // Apparently sprite zero hit cannot occur at
                         // x=255 due to "an obscure reason related to
                         // the pixel pipeline."
-                        if i == 0 && bg_pixel != None && x != 255 {
+                        if oam.sprite_zero && bg_pixel != None && x != 255 && self.scanline < 239 {
                             self.sprite_zero = true;
                         }
 
