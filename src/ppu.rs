@@ -40,6 +40,19 @@ pub struct OamData {
     index: u8,
     attr: u8,
     left: u8,
+    sprite_zero: bool,
+}
+
+impl OamData {
+    fn new() -> OamData {
+        OamData {
+            top: 0xFF,
+            index: 0xFF,
+            attr: 0xFF,
+            left: 0xFF,
+            sprite_zero: false,
+        }
+    }
 }
 
 fn palette(byte: u8) -> Color {
@@ -145,7 +158,7 @@ pub struct Ppu {
 
     // Sprites
     oam: [u8; 0x100],
-    secondary_oam: [u8; 0x20],
+    secondary_oam: [OamData; 8],
     oam_addr: u8,
     vblank: bool,
     sprite_zero: bool,
@@ -181,7 +194,7 @@ impl Ppu {
             attribute_low: 0,
             attribute_high: 0,
             oam: [0; 0x100],
-            secondary_oam: [0; 0x20],
+            secondary_oam: [OamData::new(); 8],
             oam_addr: 0,
             vblank: false,
             sprite_zero: false,
@@ -470,15 +483,6 @@ impl Ppu {
         }
     }
 
-    fn read_secondary_oam(&self, oam_addr: usize) -> OamData {
-        OamData {
-            top: self.secondary_oam[oam_addr].saturating_add(1),
-            index: self.secondary_oam[oam_addr + 1],
-            attr: self.secondary_oam[oam_addr + 2],
-            left: self.secondary_oam[oam_addr + 3],
-        }
-    }
-
     // Return the color for the sprite at the current beam position
     // (if any).
     fn sprite_pixel(&mut self) -> Option<Color> {
@@ -491,7 +495,7 @@ impl Ppu {
 
         // Everything in secondary OAM is already is on the current line
         for i in 0..8 {
-            let oam = self.read_secondary_oam(i * 4);
+            let oam = self.secondary_oam[i];
             if let Some(column) = x.checked_sub(oam.left) {
                 if column < 8 {
                     if let Some(color) = self.sprite_color(x, y, oam) {
@@ -599,8 +603,8 @@ impl Ppu {
     }
 
     fn clear_secondary_oam(&mut self) {
-        for i in 0..32 {
-            self.secondary_oam[i] = 0xFF;
+        for i in 0..8 {
+            self.secondary_oam[i] = OamData::new();
         }
     }
 
@@ -612,17 +616,22 @@ impl Ppu {
         let mut n = 0;
         for i in 0..64 {
             let oi = i * 4;
-            let ni = n * 4;
 
             let y_pos = self.oam[oi];
-            if let Some(line) = y.checked_sub(y_pos) {
-                if line < sprite_size {
-                    self.secondary_oam[ni] = self.oam[oi];
-                    self.secondary_oam[ni + 1] = self.oam[oi + 1];
-                    self.secondary_oam[ni + 2] = self.oam[oi + 2];
-                    self.secondary_oam[ni + 3] = self.oam[oi + 3];
+
+            match y.checked_sub(y_pos) {
+                Some(line) if line < sprite_size => {
+                    self.secondary_oam[n] = OamData {
+                        top: self.oam[oi].saturating_add(1),
+                        index: self.oam[oi + 1],
+                        attr: self.oam[oi + 2],
+                        left: self.oam[oi + 3].saturating_add(1),
+                        sprite_zero: i == 0,
+                    };
+
                     n += 1;
                 }
+                _ => (),
             }
 
             if n == 8 {
