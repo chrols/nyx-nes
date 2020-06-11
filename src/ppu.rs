@@ -160,7 +160,7 @@ pub struct Ppu {
     oam: [u8; 0x100],
     secondary_oam: [OamData; 8],
     oam_addr: u8,
-    vblank: bool,
+    nmi_occurred: bool,
     sprite_zero: bool,
     sprite_overflow: bool,
     vram: [u8; 0x4000],
@@ -197,7 +197,7 @@ impl Ppu {
             oam: [0; 0x100],
             secondary_oam: [OamData::new(); 8],
             oam_addr: 0,
-            vblank: false,
+            nmi_occurred: false,
             sprite_zero: false,
             sprite_overflow: false,
             vram: [0; 0x4000],
@@ -325,13 +325,10 @@ impl Ppu {
 
     fn prerender_scanline(&mut self) {
         match self.current_cycle {
-            0 => {
-                self.vblank = true;
-                self.updated = true;
-            }
+            0 => self.updated = true,
             1 => {
                 self.sprite_zero = false;
-                self.vblank = false;
+                self.nmi_occurred = false;
             }
             2...255 => {
                 if self.current_cycle % 8 == 0 {
@@ -505,7 +502,7 @@ impl Ppu {
     // Return the color for the sprite at the current beam position
     // (if any).
     fn sprite_pixel(&mut self) -> Option<Color> {
-        let x = (self.current_cycle - 1) as u8;
+        let x = (self.current_cycle) as u8;
         let y = (self.scanline) as u8;
 
         if !self.show_sprites || (x < 8 && !self.show_left_sprites) {
@@ -609,6 +606,8 @@ impl Ppu {
 
     // Render pixel for the current "beam" position
     fn render_pixel(&mut self) {
+        // Rendering occurs on cycle 1..256. Underlying canvas is
+        // 0-indexed.
         let x = self.current_cycle - 1;
         let y = self.scanline;
 
@@ -710,19 +709,19 @@ impl Ppu {
         self.show_sprites = (0x10 & byte) != 0;
 
         if (0x01 & byte) != 0 {
-            unimplemented!("Do not know how to do greyscale");
+            println!("Do not know how to do greyscale");
         }
 
         if (0x20 & byte) != 0 {
-            unimplemented!("Do not know how to emphasize red");
+            println!("Do not know how to emphasize red");
         }
 
         if (0x40 & byte) != 0 {
-            unimplemented!("Do not know how to emphasize green");
+            println!("Do not know how to emphasize green");
         }
 
         if (0x80 & byte) != 0 {
-            unimplemented!("Do not know how to emphasize blue");
+            println!("Do not know how to emphasize blue");
         }
     }
 
@@ -868,10 +867,10 @@ impl Ppu {
         // w:                  = 0
         self.write_toggle = false;
 
-        let mut byte = if self.vblank { 0x80 } else { 0 };
+        let mut byte = if self.nmi_occurred { 0x80 } else { 0 };
         byte |= if self.sprite_zero { 0x40 } else { 0 };
         byte |= if self.sprite_overflow { 0x20 } else { 0 };
-        self.vblank = false;
+        self.nmi_occurred = false;
         byte
     }
 
@@ -879,7 +878,7 @@ impl Ppu {
         if self.generate_nmi {
             self.cpu_nmi = true;
         }
-        self.vblank = true;
+        self.nmi_occurred = true;
     }
 
     fn horizontal_t2v(&mut self) {
