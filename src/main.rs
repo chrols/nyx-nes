@@ -7,6 +7,7 @@ mod kevtris;
 mod mapper;
 mod png;
 mod ppu;
+mod record;
 use std::env;
 
 fn main() {

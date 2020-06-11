@@ -4,6 +4,7 @@ use crate::cpu::Cpu;
 use crate::png;
 use crate::ppu;
 use crate::ppu::Ppu;
+use crate::record;
 
 use std::time::Instant;
 
@@ -97,9 +98,11 @@ pub fn execute(cpu: &mut Cpu) {
     canvas.clear();
     canvas.present();
 
+    let mut gif_encoder: Option<record::GifEncoder> = None;
     let mut frame_tick = Instant::now();
     let mut input_poll = Instant::now();
     let mut event_pump = sdl_context.event_pump().unwrap();
+
     'running: loop {
         let msec_since_poll = input_poll.elapsed().as_millis();
         // Approx 16 ms between frames
@@ -118,6 +121,17 @@ pub fn execute(cpu: &mut Cpu) {
                         Button::Start => cpu.gamepad.start = true,
                         Button::A => cpu.gamepad.a = true,
                         Button::X => cpu.gamepad.b = true,
+                        Button::LeftShoulder => {
+                            let res = match gif_encoder {
+                                Some(_) => None,
+                                None => Some(record::new_gif_encoder(
+                                    DISP_WIDTH as u16,
+                                    DISP_HEIGHT as u16,
+                                )),
+                            };
+                            gif_encoder = res;
+                        }
+
                         _ => println!("{:?}", button),
                     },
                     Event::ControllerButtonUp { button, .. } => match button {
@@ -176,6 +190,15 @@ pub fn execute(cpu: &mut Cpu) {
 
         if cpu.ppu.updated {
             render(&mut canvas, &mut cpu.ppu);
+
+            match &mut gif_encoder {
+                Some(encoder) => {
+                    if cpu.ppu.frame % 4 == 0 {
+                        record::write_gif_frame(encoder, &cpu.ppu);
+                    }
+                }
+                None => (),
+            }
 
             let buffer = cpu.apu.drain();
 

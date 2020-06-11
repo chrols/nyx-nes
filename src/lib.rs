@@ -8,3 +8,4 @@ mod gamepad;
 mod kevtris;
 mod mapper;
 mod png;
+mod record;
