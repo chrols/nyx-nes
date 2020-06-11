@@ -628,6 +628,11 @@ impl Ppu {
 
     /// FIXME: Not 100% accurate, does not consider sprite overflow
     fn sprite_evaluation(&mut self) {
+        // If both bg and sprites are disabled no sprite evaluation should take place
+        if !self.show_bg && !self.show_sprites {
+            return;
+        }
+
         let sprite_size = if self.large_sprites { 16 } else { 8 };
         let y = self.scanline as u8;
 
