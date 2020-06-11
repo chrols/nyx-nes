@@ -175,6 +175,7 @@ pub struct Ppu {
     pub updated: bool,
     pub current_cycle: usize,
     pub scanline: usize,
+    pub frame: usize,
     pub cpu_nmi: bool,
     pub rom: Option<Rc<RefCell<Box<Cartridge>>>>,
 }
@@ -209,7 +210,8 @@ impl Ppu {
             prev_canvas: [Color::rgb(255, 255, 255); 256 * 240],
             updated: false,
             generate_nmi: false,
-            scanline: 261,
+            scanline: 0,
+            frame: 0,
             current_cycle: 0,
             bg_pattern_offset: false,
             sprite_offset: false,
@@ -302,6 +304,22 @@ impl Ppu {
             self.scanline += 1;
             self.scanline %= SCANLINES_PER_FRAME;
         }
+
+        if self.current_cycle == 0 && self.scanline == 261 {
+            self.frame += 1;
+        }
+
+        if self.odd_frame_cycle_skip() {
+            self.current_cycle = 0;
+            self.scanline = 0;
+        }
+    }
+
+    fn odd_frame_cycle_skip(&mut self) -> bool {
+        (self.show_bg || self.show_sprites)
+            && self.frame % 2 == 1
+            && self.scanline == 261
+            && self.current_cycle == 340
     }
 
     fn prerender_scanline(&mut self) {
@@ -1100,5 +1118,48 @@ mod tests {
         ppu.write_scroll(0);
         ppu.write_scroll(0);
         assert_eq!(0x0400, ppu.temp_address);
+    }
+
+    #[test]
+    fn reading_ppustatus_clears_vblank() {
+        let mut ppu = Ppu::new();
+        ppu.vblank();
+        assert_eq!(true, ppu.nmi_occurred);
+        assert_eq!(0x80, ppu.read(0x2002));
+        assert_eq!(0x00, ppu.read(0x2002));
+    }
+
+    #[test]
+    fn frame_timing() {
+        const EVEN_FRAME_TIME: usize = 262 * 341;
+        const ODD_FRAME_TIME: usize = EVEN_FRAME_TIME - 1;
+
+        let mut ppu = Ppu::new();
+        // Clear VBLANK
+        ppu.read(0x2002);
+        assert_eq!(0, ppu.read(0x2002));
+
+        // Wait for VBLANK
+        while ppu.read(0x2002) & 0x80 == 0 {
+            ppu.cycle();
+        }
+
+        let mut count = 0;
+
+        // Wait for next VBLANK
+        while ppu.read(0x2002) & 0x80 == 0 {
+            ppu.cycle();
+            count += 1;
+        }
+        assert_eq!(ODD_FRAME_TIME, count);
+
+        count = 0;
+
+        // Wait for next VBLANK
+        while ppu.read(0x2002) & 0x80 == 0 {
+            ppu.cycle();
+            count += 1;
+        }
+        assert_eq!(EVEN_FRAME_TIME, count);
     }
 }
