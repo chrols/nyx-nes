@@ -228,6 +228,7 @@ impl Ppu {
         match address % 8 {
             1 => 0,
             2 => self.read_status(),
+            4 => self.read_oamdata(),
             7 => self.read_data(),
             _ => panic!(
                 "PPU Read: Unimplemented register: {:X} => {}",
@@ -723,6 +724,10 @@ impl Ppu {
         if (0x80 & byte) != 0 {
             unimplemented!("Do not know how to emphasize blue");
         }
+    }
+
+    fn read_oamdata(&mut self) -> u8 {
+        self.oam[self.oam_addr as usize]
     }
 
     fn write_oamdata(&mut self, byte: u8) {
