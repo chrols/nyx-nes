@@ -5,7 +5,6 @@ use crate::mapper::dummy::DummyROM;
 use crate::mapper::Cartridge;
 
 use ines::Mirroring;
-use std::cell::Cell;
 use std::panic;
 
 use std::cell::RefCell;
@@ -561,10 +560,6 @@ impl Ppu {
 
     // FIXME Mutates state. Make explicit?
     fn bg_pixel(&mut self) -> Option<Color> {
-        if !self.show_bg || (self.current_cycle - 1 < 8 && !self.show_left_sprites) {
-            return None;
-        }
-
         let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 {
             1
         } else {
@@ -592,6 +587,10 @@ impl Ppu {
         self.attribute_high <<= 1;
 
         if color == 0 {
+            return None;
+        }
+
+        if !self.show_bg || (self.current_cycle - 1 < 8 && !self.show_left_bg) {
             return None;
         }
 
