@@ -799,7 +799,7 @@ impl Cpu {
     }
 
     fn pop(&mut self) -> u8 {
-        self.sp += 1;
+        self.sp = self.sp.wrapping_add(1);
         self.memory_read(0x100 + self.sp as u16)
     }
 
