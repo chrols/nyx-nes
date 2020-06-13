@@ -741,10 +741,17 @@ impl Ppu {
     // $2006  PPUADDR
     fn write_address(&mut self, byte: u8) {
         if self.write_toggle {
-            self.another_address |= byte as u16;
+            // t: ....... HGFEDCBA = d: HGFEDCBA
+            // v                   = t
+            // w:                  = 0
+            self.another_address = (self.another_address & 0xFF00) | byte as u16;
+            self.address = self.another_address;
             self.write_toggle = false;
         } else {
-            self.another_address = (byte as u16) << 8;
+            // t: .FEDCBA ........ = d: ..FEDCBA
+            // t: X...... ........ = 0
+            // w:                  = 1
+            self.another_address = (self.another_address & 0x00FF) | ((byte as u16) << 8);
             self.write_toggle = true;
         }
     }
