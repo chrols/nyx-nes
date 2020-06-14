@@ -316,7 +316,7 @@ impl Ppu {
     }
 
     fn odd_frame_cycle_skip(&mut self) -> bool {
-        (self.show_bg || self.show_sprites)
+        self.rendering_enabled()
             && self.frame % 2 == 1
             && self.scanline == 261
             && self.current_cycle == 340
@@ -628,7 +628,7 @@ impl Ppu {
     /// FIXME: Not 100% accurate, does not consider sprite overflow
     fn sprite_evaluation(&mut self) {
         // If both bg and sprites are disabled no sprite evaluation should take place
-        if !self.show_bg && !self.show_sprites {
+        if !self.rendering_enabled() {
             return;
         }
 
@@ -893,13 +893,19 @@ impl Ppu {
     }
 
     fn horizontal_t2v(&mut self) {
-        // v: ....F.. ...EDCBA = t: ....F.. ...EDCBA
-        self.address = (self.address & 0xFBE0) | (self.temp_address & 0x041F);
+        if self.rendering_enabled() {
+            // v: ....F.. ...EDCBA = t: ....F.. ...EDCBA
+            self.address = (self.address & 0xFBE0) | (self.temp_address & 0x041F);
+        }
     }
 
     fn vertical_t2v(&mut self) {
         // v: IHG F.ED CBA. .... = t: IHG F.ED CBA. ....
         self.address = (self.address & 0x041F) | (self.temp_address & !0x041F);
+    }
+
+    fn rendering_enabled(&self) -> bool {
+        self.show_bg || self.show_sprites
     }
 
     fn update_tile(&mut self) {
