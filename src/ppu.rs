@@ -31,6 +31,12 @@ impl Color {
     pub fn rgb(r: u8, g: u8, b: u8) -> Color {
         Color { r, g, b }
     }
+
+    pub fn to_grayscale(&self) -> Color {
+        let v: u8 =
+            ((self.r as f32 * 0.21) + (self.r as f32 * 0.72) + (self.r as f32 * 0.07)) as u8;
+        Color { r: v, g: v, b: v }
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -168,6 +174,7 @@ pub struct Ppu {
     show_left_sprites: bool,
     show_bg: bool,
     show_sprites: bool,
+    grayscale: bool,
     data_buffer: u8,
     pub canvas: [Color; 256 * 240],
     pub prev_canvas: [Color; 256 * 240],
@@ -204,6 +211,7 @@ impl Ppu {
             show_left_sprites: true,
             show_bg: true,
             show_sprites: true,
+            grayscale: false,
             data_buffer: 0,
             canvas: [Color::new(); 256 * 240],
             prev_canvas: [Color::rgb(255, 255, 255); 256 * 240],
@@ -616,6 +624,11 @@ impl Ppu {
             bg_pixel
         } else {
             self.universal_bg()
+        };
+
+        if self.grayscale {
+            let p = self.canvas[(y * 256 + x) as usize];
+            self.canvas[(y * 256 + x) as usize] = p.to_grayscale();
         }
     }
 
@@ -712,9 +725,7 @@ impl Ppu {
         self.show_bg = (0x08 & byte) != 0;
         self.show_sprites = (0x10 & byte) != 0;
 
-        if (0x01 & byte) != 0 {
-            println!("Do not know how to do greyscale");
-        }
+        self.grayscale = (0x01 & byte) != 0;
 
         if (0x20 & byte) != 0 {
             println!("Do not know how to emphasize red");
