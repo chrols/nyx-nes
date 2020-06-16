@@ -122,6 +122,12 @@ pub fn execute(cpu: &mut Cpu) {
                         Button::A => cpu.gamepad.a = true,
                         Button::X => cpu.gamepad.b = true,
                         Button::LeftShoulder => {
+                            cpu.save_state();
+                        }
+                        Button::RightShoulder => {
+                            cpu.load_state();
+                        }
+                        Button::Guide => {
                             let res = match gif_encoder {
                                 Some(_) => None,
                                 None => Some(record::new_gif_encoder(
@@ -154,7 +160,7 @@ pub fn execute(cpu: &mut Cpu) {
                         keycode: Some(kc), ..
                     } => match kc {
                         Keycode::Num1 => cpu.tracing = !cpu.tracing,
-                        Keycode::Num2 => super::png::write_png_frame(&cpu.ppu),
+                        Keycode::Num2 => png::write_png_frame(&cpu.ppu),
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
                         Keycode::O => cpu.ppu.dump_oam(),
                         Keycode::E => cpu.ppu.dump_nametables(),

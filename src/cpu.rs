@@ -5,19 +5,22 @@ use super::mapper;
 use super::mapper::Cartridge;
 use super::ppu::Ppu;
 use crate::apu::Apu;
+
 use std::fmt;
-use std::panic;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct Cpu {
     a: u8,
     x: u8,
     y: u8,
     pc: u16,
     sp: u8,
-    ram: [u8; 0x800],
+    ram: Vec<u8>,
     c: bool,            // Carry flag
     z: bool,            // Zero flag
     i: bool,            // Interrupt disable
@@ -26,10 +29,10 @@ pub struct Cpu {
     n: bool,            // Negative flag
     pub unittest: bool, // Unittest mode
     pub tracing: bool,  // CPU tracing (slow)
-    rom: Option<Rc<RefCell<Box<Cartridge>>>>,
     pub ppu: Ppu,
     pub apu: Apu,
     pub cyc: u64,
+    #[serde(skip)]
     pub gamepad: Gamepad,
 }
 
@@ -173,7 +176,7 @@ impl Cpu {
             y: 0,
             pc: 0,
             sp: 0xFD,
-            ram: [0; 0x800],
+            ram: vec![0; 0x800],
             c: false,
             z: false,
             i: true,
@@ -182,12 +185,63 @@ impl Cpu {
             n: false,
             unittest: false,
             tracing: false,
-            rom: None,
             ppu: Ppu::new(),
             apu: Apu::new(),
             cyc: 7,
             gamepad: Gamepad::new(),
         }
+    }
+
+    fn load_string(path: &str) -> String {
+        let mut file = File::open(&path).unwrap();
+        let mut s = String::new();
+        match file.read_to_string(&mut s) {
+            Err(why) => panic!("couldn't read {}: {}", path, why),
+            Ok(_) => print!("{} loaded", path),
+        }
+        s
+    }
+
+    fn save_string(path: &str, json: &str) {
+        let path = Path::new(path);
+        let display = path.display();
+
+        // Open a file in write-only mode, returns `io::Result<File>`
+        let mut file = match File::create(&path) {
+            Err(why) => panic!("couldn't create {}: {}", display, why),
+            Ok(file) => file,
+        };
+
+        // Write the `LOREM_IPSUM` string to `file`, returns `io::Result<()>`
+        match file.write_all(json.as_bytes()) {
+            Err(why) => panic!("couldn't write to {}: {}", display, why),
+            Ok(_) => println!("successfully wrote to {}", display),
+        }
+    }
+
+    pub fn load_state(&mut self) {
+        let rom = Option::take(&mut self.ppu.rom);
+        let json = Cpu::load_string("save.sav");
+        let cart_json = Cpu::load_string("cart.sav");
+        let new_cpu: Self = serde_json::from_str(&json).unwrap();
+        *self = new_cpu;
+        self.ppu.rom = rom;
+        if let Some(game) = &mut self.ppu.rom {
+            game.from_json(&cart_json);
+        }
+        self.ppu.invalidate();
+    }
+
+    pub fn save_state(&self) {
+        let json = serde_json::to_string(self).unwrap();
+        let cart_json = if let Some(game) = &self.ppu.rom {
+            game.to_json()
+        } else {
+            String::from("")
+        };
+
+        Cpu::save_string("save.sav", &json);
+        Cpu::save_string("cart.sav", &cart_json);
     }
 
     pub fn kevtris_nestest() {
@@ -224,9 +278,7 @@ impl Cpu {
     }
 
     pub fn load_game(&mut self, file: ines::File) {
-        let game = Rc::new(RefCell::new(mapper::new_mapper(file)));
-        self.ppu.load_game(game.clone());
-        self.rom = Some(game);
+        self.ppu.load_game(file);
     }
 
     fn adc(&mut self, step: &Step) {
@@ -725,8 +777,8 @@ impl Cpu {
             0x4016 => self.gamepad.read(),
             0x4017 => 0, // FIXME Implement gamepad 2
             0x4018...0x401F => panic!("Read from disabled registers"),
-            0x4020...0xFFFF => match &mut self.rom {
-                Some(game) => game.borrow_mut().read(address),
+            0x4020...0xFFFF => match &mut self.ppu.rom {
+                Some(game) => game.read(address),
                 None => panic!("No game loaded"),
             },
         }
@@ -767,8 +819,8 @@ impl Cpu {
             }
             0x4017 => self.apu_write(address, byte),
             0x4018...0x401F => println!("Write to disabled memory area"),
-            0x4020...0xFFFF => match &mut self.rom {
-                Some(game) => game.borrow_mut().write(address, byte),
+            0x4020...0xFFFF => match &mut self.ppu.rom {
+                Some(game) => game.write(address, byte),
                 None => panic!("No game loaded"),
             },
         }

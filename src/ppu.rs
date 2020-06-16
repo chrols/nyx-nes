@@ -1,14 +1,13 @@
 //! http://wiki.nesdev.com/w/index.php/PPU_rendering
 
 use crate::ines;
-use crate::mapper::dummy::DummyROM;
+use crate::mapper;
 use crate::mapper::Cartridge;
 
 use ines::Mirroring;
 use std::panic;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use serde::{Deserialize, Serialize};
 
 /// The PPU renders 262 scanlines per frame.
 const SCANLINES_PER_FRAME: usize = 262;
@@ -16,7 +15,7 @@ const SCANLINES_PER_FRAME: usize = 262;
 /// Each scanline lasts for 341 PPU clock cycles
 const CYCLES_PER_SCANLINE: usize = 341;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -39,7 +38,7 @@ impl Color {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct OamData {
     top: u8,
     index: u8,
@@ -133,6 +132,7 @@ fn palette(byte: u8) -> Color {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Ppu {
     // Variables corresponding to physical registers
 
@@ -162,13 +162,13 @@ pub struct Ppu {
     generate_nmi: bool,
 
     // Sprites
-    oam: [u8; 0x100],
+    oam: Vec<u8>,
     secondary_oam: [OamData; 8],
     oam_addr: u8,
     nmi_occurred: bool,
     sprite_zero: bool,
     sprite_overflow: bool,
-    vram: [u8; 0x4000],
+    vram: Vec<u8>,
 
     show_left_bg: bool,
     show_left_sprites: bool,
@@ -176,14 +176,15 @@ pub struct Ppu {
     show_sprites: bool,
     grayscale: bool,
     data_buffer: u8,
-    pub canvas: [Color; 256 * 240],
-    pub prev_canvas: [Color; 256 * 240],
+    pub canvas: Vec<Color>,
+    pub prev_canvas: Vec<Color>,
     pub updated: bool,
     pub current_cycle: usize,
     pub scanline: usize,
     pub frame: usize,
     pub cpu_nmi: bool,
-    pub rom: Option<Rc<RefCell<Box<Cartridge>>>>,
+    #[serde(skip)]
+    pub rom: Option<Box<Cartridge>>,
 }
 
 impl Ppu {
@@ -200,21 +201,21 @@ impl Ppu {
             fine_x: 0,
             attribute_low: 0,
             attribute_high: 0,
-            oam: [0; 0x100],
+            oam: vec![0; 0x100],
             secondary_oam: [OamData::new(); 8],
             oam_addr: 0,
             nmi_occurred: false,
             sprite_zero: false,
             sprite_overflow: false,
-            vram: [0; 0x4000],
+            vram: vec![0; 0x4000],
             show_left_bg: true,
             show_left_sprites: true,
             show_bg: true,
             show_sprites: true,
             grayscale: false,
             data_buffer: 0,
-            canvas: [Color::new(); 256 * 240],
-            prev_canvas: [Color::rgb(255, 255, 255); 256 * 240],
+            canvas: vec![Color::new(); 256 * 240],
+            prev_canvas: vec![Color::rgb(255, 255, 255); 256 * 240],
             updated: false,
             generate_nmi: false,
             scanline: 0,
@@ -223,12 +224,19 @@ impl Ppu {
             bg_pattern_offset: false,
             sprite_offset: false,
             cpu_nmi: false,
-            rom: Some(Rc::new(RefCell::new(DummyROM::new()))),
+            rom: None,
         }
     }
 
-    pub fn load_game(&mut self, game: Rc<RefCell<Box<Cartridge>>>) {
-        self.rom = Some(game);
+    pub fn load_game(&mut self, file: ines::File) {
+        self.rom = Some(mapper::new_mapper(file));
+    }
+
+    pub fn invalidate(&mut self) {
+        for i in 0..(256 * 240) {
+            self.canvas[i] = Color::rgb(0, 0, 0);
+            self.prev_canvas[i] = Color::rgb(255, 255, 255);
+        }
     }
 
     pub fn read(&mut self, address: u16) -> u8 {
@@ -797,7 +805,7 @@ impl Ppu {
     fn read_memory(&mut self, address: u16) -> u8 {
         match address {
             0x0000...0x1FFF => match &mut self.rom {
-                Some(game) => game.borrow_mut().ppu_read(address),
+                Some(game) => game.ppu_read(address),
                 None => panic!("No game loaded"),
             },
             0x2000...0x3FFF => self.vram[self.actual_vram_address(address) as usize],
@@ -808,17 +816,20 @@ impl Ppu {
     fn write_memory(&mut self, address: u16, byte: u8) {
         match address {
             0x0000...0x1FFF => match &mut self.rom {
-                Some(game) => game.borrow_mut().ppu_write(address, byte),
+                Some(game) => game.ppu_write(address, byte),
                 None => panic!("No game loaded"),
             },
-            0x2000...0x3FFF => self.vram[self.actual_vram_address(address) as usize] = byte,
+            0x2000...0x3FFF => {
+                let address = self.actual_vram_address(address) as usize;
+                self.vram[address] = byte;
+            }
             0x4000...0xFFFF => self.write_memory(address % 0x4000, byte),
         }
     }
 
     fn actual_vram_address(&self, address: u16) -> u16 {
         let mirroring = if let Some(game) = &self.rom {
-            game.borrow().mirroring()
+            game.mirroring()
         } else {
             Mirroring::Vertical
         };
@@ -993,6 +1004,7 @@ impl Ppu {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mapper::dummy::DummyROM;
 
     #[test]
     fn large_sprite_address() {
@@ -1022,8 +1034,7 @@ mod tests {
         let mut rom = DummyROM::new();
         rom.mirroring = Mirroring::Horizontal;
 
-        let game = Rc::new(RefCell::new(rom as Box<Cartridge>));
-        ppu.load_game(game);
+        ppu.rom = Some(rom);
 
         ppu.write_memory(0x2000, 100);
         assert_eq!(ppu.actual_vram_address(0x2000), 0x2000);
@@ -1042,8 +1053,7 @@ mod tests {
         let mut rom = DummyROM::new();
         rom.mirroring = Mirroring::Vertical;
 
-        let game = Rc::new(RefCell::new(rom as Box<Cartridge>));
-        ppu.load_game(game);
+        ppu.rom = Some(rom);
 
         ppu.write_memory(0x2000, 100);
         ppu.write_memory(0x2400, 128);

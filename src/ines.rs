@@ -2,7 +2,9 @@ use std::fs;
 
 extern crate zip;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Mirroring {
     Horizontal,
     Vertical,
@@ -22,6 +24,23 @@ pub struct File {
     pub trainer: Vec<u8>,
     pub prg_rom: Vec<u8>,
     pub chr_rom: Vec<u8>,
+}
+
+impl Default for File {
+    fn default() -> File {
+        File {
+            prg_rom_blocks: 0,
+            chr_rom_blocks: 0,
+            mirroring: Mirroring::Horizontal,
+            trainer_present: false,
+            battery_ram: false,
+            four_screen_vram: false,
+            mapper: 0,
+            trainer: vec![],
+            prg_rom: vec![],
+            chr_rom: vec![],
+        }
+    }
 }
 
 fn unzip(file: &Vec<u8>) -> Result<Vec<u8>, &'static str> {

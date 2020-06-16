@@ -13,6 +13,12 @@ pub struct Gamepad {
     polling: bool,
 }
 
+impl Default for Gamepad {
+    fn default() -> Self {
+        Gamepad::new()
+    }
+}
+
 impl Gamepad {
     pub fn new() -> Gamepad {
         Gamepad {

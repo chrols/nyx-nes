@@ -1,19 +1,24 @@
 use super::Cartridge;
 use crate::ines::File;
 use crate::ines::Mirroring;
+use std::mem;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct NROM {
+    #[serde(skip)]
     pub file: File,
-    sram: [u8; 0x2000],
-    chr_ram: [u8; 0x2000],
+    sram: Vec<u8>,
+    chr_ram: Vec<u8>,
 }
 
 impl NROM {
     pub fn new(file: File) -> NROM {
         NROM {
             file,
-            sram: [0; 0x2000],
-            chr_ram: [0; 0x2000],
+            sram: vec![0; 0x2000],
+            chr_ram: vec![0; 0x2000],
         }
     }
 }
@@ -66,5 +71,15 @@ impl Cartridge for NROM {
 
     fn mirroring(&self) -> Mirroring {
         self.file.mirroring
+    }
+
+    fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    fn from_json(&mut self, json: &str) {
+        let mut nrom: NROM = serde_json::from_str(json).unwrap();
+        mem::swap(&mut self.sram, &mut nrom.sram);
+        mem::swap(&mut self.chr_ram, &mut nrom.chr_ram);
     }
 }

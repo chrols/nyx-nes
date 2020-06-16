@@ -1,9 +1,12 @@
 use super::envelope::Envelope;
 
+use serde::{Deserialize, Serialize};
+
 const TIMER_PERIOD: [u16; 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
 ];
 
+#[derive(Serialize, Deserialize)]
 pub struct Noise {
     pub enabled: bool,
     envelope: Envelope,
@@ -119,7 +122,6 @@ mod tests {
             }
         }
         assert_eq!(v, 1);
-
     }
 
     #[test]
@@ -132,6 +134,5 @@ mod tests {
             }
         }
         assert_eq!(v, 1);
-
     }
 }

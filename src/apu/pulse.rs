@@ -1,4 +1,5 @@
 use super::envelope::Envelope;
+use serde::{Deserialize, Serialize};
 
 const DUTY_CYCLE: [[u8; 8]; 4] = [
     [0u8, 1u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8],
@@ -7,6 +8,7 @@ const DUTY_CYCLE: [[u8; 8]; 4] = [
     [1u8, 0u8, 0u8, 1u8, 1u8, 1u8, 1u8, 1u8],
 ];
 
+#[derive(Serialize, Deserialize)]
 pub struct Pulse {
     pub enabled: bool,
     envelope: Envelope,

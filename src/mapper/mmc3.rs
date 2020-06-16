@@ -2,16 +2,25 @@ use super::Cartridge;
 use crate::ines::File;
 use crate::ines::Mirroring;
 
+use serde::{Deserialize, Serialize};
+
+use std::mem;
+
+#[derive(Serialize, Deserialize)]
 pub struct MMC3 {
+    #[serde(skip)]
     pub file: File,
     mirroring: Mirroring,
     chr_inversion: bool,
-    prg_ram: [u8; 0x2000],
+    prg_ram: Vec<u8>,
     prg_bank_mode: bool,
     prg_offset: [usize; 4],
     chr_offset: [usize; 8],
     bank_register: [usize; 8],
     bank_select: usize,
+    irq_counter: u8,
+    irq_counter_reload: u8,
+    irq_enabled: bool,
 }
 
 impl MMC3 {
@@ -22,12 +31,15 @@ impl MMC3 {
             mirroring: file.mirroring,
             file,
             chr_inversion: false,
-            prg_ram: [0; 0x2000],
+            prg_ram: vec![0; 0x2000],
             prg_bank_mode: false,
             prg_offset: [0, 0, prg_next_to_last, prg_last_block],
             chr_offset: [0, 1, 2, 3, 4, 5, 6, 7],
             bank_register: [0; 8],
             bank_select: 0,
+            irq_counter: 0,
+            irq_counter_reload: 0,
+            irq_enabled: false,
         }
     }
 
@@ -81,15 +93,30 @@ impl MMC3 {
         };
     }
 
-    fn prg_ram_protect(&mut self, byte: u8) {}
+    fn prg_ram_protect(&mut self, byte: u8) {
+        if byte != 0 {
+            println!("Ram protection: {:X}", byte);
+        }
+    }
 
-    fn irq_latch(&mut self, byte: u8) {}
+    fn irq_latch(&mut self, byte: u8) {
+        self.irq_counter_reload = byte;
+    }
 
-    fn irq_reload(&mut self) {}
+    fn irq_reload(&mut self) {
+        // FIXME Reload should occur at next "rising edge"
+        self.irq_counter = self.irq_counter_reload;
+    }
 
-    fn irq_enable(&mut self) {}
+    fn irq_enable(&mut self) {
+        println!("IRQ ENable");
+        self.irq_enabled = true;
+    }
 
-    fn irq_disable(&mut self) {}
+    fn irq_disable(&mut self) {
+        println!("IRQ Disable");
+        self.irq_enabled = false;
+    }
 
     fn update_offsets(&mut self) {
         let prg_last_block = self.file.prg_rom_blocks as usize * 2 - 1;
@@ -149,6 +176,7 @@ impl Cartridge for MMC3 {
         };
 
         let offset = (address % 0x2000) as usize;
+        //println!("{:X}, {:X}", prg_addr, self.prg_offset[0]);
         self.file.prg_rom[prg_addr + offset]
     }
 
@@ -192,12 +220,33 @@ impl Cartridge for MMC3 {
     fn mirroring(&self) -> Mirroring {
         self.mirroring
     }
+
+    fn to_json(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    fn from_json(&mut self, json: &str) {
+        let mut rom: MMC3 = serde_json::from_str(json).unwrap();
+        mem::swap(&mut self.mirroring, &mut rom.mirroring);
+        mem::swap(&mut self.chr_inversion, &mut rom.chr_inversion);
+        mem::swap(&mut self.prg_ram, &mut rom.prg_ram);
+        mem::swap(&mut self.prg_bank_mode, &mut rom.prg_bank_mode);
+        mem::swap(&mut self.prg_offset, &mut rom.prg_offset);
+        mem::swap(&mut self.chr_offset, &mut rom.chr_offset);
+        mem::swap(&mut self.bank_register, &mut rom.bank_register);
+        mem::swap(&mut self.bank_select, &mut rom.bank_select);
+        mem::swap(&mut self.irq_counter, &mut rom.irq_counter);
+        mem::swap(&mut self.irq_counter_reload, &mut rom.irq_counter_reload);
+        mem::swap(&mut self.irq_enabled, &mut rom.irq_enabled);
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
     #[test]
-    fn register_resets() {}
+    fn register_resets() {
+        assert!(false);
+    }
 }

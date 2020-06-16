@@ -14,6 +14,14 @@ pub trait Cartridge {
     fn ppu_read(&mut self, address: u16) -> u8;
     fn ppu_write(&mut self, address: u16, byte: u8);
     fn mirroring(&self) -> Mirroring;
+
+    fn from_json(&mut self, json: &str) {
+        unimplemented!("from_json not implemented for mapper");
+    }
+
+    fn to_json(&self) -> String {
+        unimplemented!("to_json not implemented for mapper");
+    }
 }
 
 // pub enum Mapper {

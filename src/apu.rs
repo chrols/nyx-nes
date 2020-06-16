@@ -7,6 +7,9 @@ use noise::Noise;
 use pulse::Pulse;
 use triangle::Triangle;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 struct FrameCounter {
     mode_zero: bool,
     interrupt_enable: bool,
@@ -66,6 +69,7 @@ impl FrameCounter {
 const NSEC_CPU_CYCLE: u64 = 1_000_000_000 / 1_789_773;
 const NSEC_SAMPLE_TIME: u64 = 1_000_000_000 / 44_100;
 
+#[derive(Serialize, Deserialize)]
 pub struct Apu {
     pulse_table: Vec<f32>,
     tnd_table: Vec<f32>,
