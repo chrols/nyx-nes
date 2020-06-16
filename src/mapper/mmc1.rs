@@ -11,7 +11,6 @@ enum PrgRomMode {
 pub struct MMC1 {
     pub file: File,
     sram: [u8; 0x2000],
-    shift_times: u8,
     shift_register: u8,
     prg_rom_mode: PrgRomMode,
     single_chr_rom: bool,
@@ -30,9 +29,8 @@ impl MMC1 {
             mirroring: file.mirroring,
             file,
             sram: [0; 0x2000],
-            shift_times: 0,
             shift_register: 0x10,
-            prg_rom_mode: PrgRomMode::FixedFirst,
+            prg_rom_mode: PrgRomMode::FixedLast,
             single_chr_rom: true,
             chr_ram: [0; 0x2000],
             chr_bank_0: 0,
