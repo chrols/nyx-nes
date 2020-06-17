@@ -152,8 +152,6 @@ pub struct Ppu {
     attribute_high: u16,
     fine_x: u8,
 
-    another_address: u16,
-
     // PPUCTRL flags
     vram_increment: bool,
     sprite_offset: bool,
@@ -191,7 +189,6 @@ impl Ppu {
     pub fn new() -> Ppu {
         Ppu {
             address: 0,
-            another_address: 0,
             vram_increment: false,
             large_sprites: false,
             temp_address: 0,
@@ -272,26 +269,26 @@ impl Ppu {
 
     // PPUDATA
     fn read_data(&mut self) -> u8 {
-        let m = self.read_memory(self.another_address);
+        let m = self.read_memory(self.address);
 
         let increment = if self.vram_increment { 32 } else { 1 };
-        self.another_address = self.another_address.wrapping_add(increment);
+        self.address = self.address.wrapping_add(increment);
 
-        if self.another_address < 0x3F00 {
+        if self.address < 0x3F00 {
             let t = self.data_buffer;
             self.data_buffer = m;
             t
         } else {
             // Reading palette data loads a memory location "underneath" it to the read buffer
-            self.data_buffer = self.read_memory(self.another_address - increment - 0x1000);
+            self.data_buffer = self.read_memory(self.address - increment - 0x1000);
             m
         }
     }
 
     fn write_data(&mut self, byte: u8) {
-        self.write_memory(self.another_address, byte);
+        self.write_memory(self.address, byte);
         let increment = if self.vram_increment { 32 } else { 1 };
-        self.another_address = self.another_address.wrapping_add(increment);
+        self.address = self.address.wrapping_add(increment);
     }
 
     /// The PPU renders 262 scanlines per frame. Each scanline lasts for
@@ -763,14 +760,14 @@ impl Ppu {
             // t: ....... HGFEDCBA = d: HGFEDCBA
             // v                   = t
             // w:                  = 0
-            self.another_address = (self.another_address & 0xFF00) | byte as u16;
-            self.address = self.another_address;
+            self.temp_address = (self.temp_address & 0xFF00) | byte as u16;
+            self.address = self.temp_address;
             self.write_toggle = false;
         } else {
             // t: .FEDCBA ........ = d: ..FEDCBA
             // t: X...... ........ = 0
             // w:                  = 1
-            self.another_address = (self.another_address & 0x00FF) | ((byte as u16) << 8);
+            self.temp_address = (self.temp_address & 0x00FF) | ((byte as u16) << 8);
             self.write_toggle = true;
         }
     }
@@ -923,7 +920,9 @@ impl Ppu {
 
     fn vertical_t2v(&mut self) {
         // v: IHG F.ED CBA. .... = t: IHG F.ED CBA. ....
-        self.address = (self.address & 0x041F) | (self.temp_address & !0x041F);
+        if self.rendering_enabled() {
+            self.address = (self.address & 0x041F) | (self.temp_address & !0x041F);
+        }
     }
 
     fn rendering_enabled(&self) -> bool {
@@ -967,6 +966,10 @@ impl Ppu {
     }
 
     fn coarse_x_increment(&mut self) {
+        if !self.rendering_enabled() {
+            return;
+        }
+
         if (self.address & 0x001F) == 31 {
             // if coarse X == 31
             self.address &= !0x001F; // coarse X = 0
@@ -977,6 +980,10 @@ impl Ppu {
     }
 
     fn y_increment(&mut self) {
+        if !self.rendering_enabled() {
+            return;
+        }
+
         if (self.address & 0x7000) != 0x7000 {
             // if fine Y < 7
             self.address += 0x1000 // increment fine Y
