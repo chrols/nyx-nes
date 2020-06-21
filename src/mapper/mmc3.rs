@@ -27,7 +27,7 @@ impl MMC3 {
     pub fn new(file: File) -> MMC3 {
         let prg_last_block = (file.prg_rom_blocks as usize * 2 - 1) * 0x2000;
         let prg_next_to_last = prg_last_block - 0x2000;
-        MMC3 {
+        let mut mmc3 = MMC3 {
             mirroring: file.mirroring,
             file,
             chr_inversion: false,
@@ -40,7 +40,9 @@ impl MMC3 {
             irq_counter: 0,
             irq_counter_reload: 0,
             irq_enabled: false,
-        }
+        };
+        mmc3.update_offsets();
+        mmc3
     }
 
     // 7  bit  0
@@ -119,41 +121,69 @@ impl MMC3 {
     }
 
     fn update_offsets(&mut self) {
-        let prg_last_block = self.file.prg_rom_blocks as usize * 2 - 1;
+        self.update_prg_offsets();
+        self.update_chr_offsets();
+    }
+
+    fn update_prg_offsets(&mut self) {
+        // File blocks are twice the size of MMC3 blocks (16 KiB vs 8 KiB)
+        let blocks = self.file.prg_rom_blocks as usize * 2;
+        let prg_last_block = blocks - 1;
         let prg_next_to_last = prg_last_block - 1;
 
+        let li = prg_last_block * 0x2000;
+        let nli = prg_next_to_last * 0x2000;
+
+        let r6_i = self.bank_register[6] % blocks * 0x2000;
+        let r7_i = self.bank_register[7] % blocks * 0x2000;
+
         if self.prg_bank_mode {
-            self.prg_offset[0] = prg_next_to_last * 0x2000;
-            self.prg_offset[1] = self.bank_register[7] * 0x2000;
-            self.prg_offset[2] = self.bank_register[6] * 0x2000;
-            self.prg_offset[3] = prg_last_block * 0x2000;
+            self.prg_offset[0] = nli;
+            self.prg_offset[1] = r7_i;
+            self.prg_offset[2] = r6_i;
+            self.prg_offset[3] = li;
         } else {
-            self.prg_offset[0] = self.bank_register[6] * 0x2000;
-            self.prg_offset[1] = self.bank_register[7] * 0x2000;
-            self.prg_offset[2] = prg_next_to_last * 0x2000;
-            self.prg_offset[3] = prg_last_block * 0x2000;
+            self.prg_offset[0] = r6_i;
+            self.prg_offset[1] = r7_i;
+            self.prg_offset[2] = nli;
+            self.prg_offset[3] = li;
         }
+    }
+
+    fn update_chr_offsets(&mut self) {
+        // File blocks are eight times the size of the MMC3 blocks ( 8 KiB vs 1 KiB)
+        let blocks = self.file.chr_rom_blocks as usize * 8;
+
+        let r0_li = (self.bank_register[0] & 0xFE) % blocks * 0x400;
+        let r0_hi = (self.bank_register[0] | 0x01) % blocks * 0x400;
+        let r1_li = (self.bank_register[1] & 0xFE) % blocks * 0x400;
+        let r1_hi = (self.bank_register[1] | 0x01) % blocks * 0x400;
+
+        let r2_i = self.bank_register[2] % blocks * 0x400;
+        let r3_i = self.bank_register[3] % blocks * 0x400;
+        let r4_i = self.bank_register[4] % blocks * 0x400;
+        let r5_i = self.bank_register[5] % blocks * 0x400;
 
         if self.chr_inversion {
-            self.chr_offset[0] = self.bank_register[2] * 0x400;
-            self.chr_offset[1] = self.bank_register[3] * 0x400;
-            self.chr_offset[2] = self.bank_register[4] * 0x400;
-            self.chr_offset[3] = self.bank_register[5] * 0x400;
+            self.chr_offset[0] = r2_i;
+            self.chr_offset[1] = r3_i;
+            self.chr_offset[2] = r4_i;
+            self.chr_offset[3] = r5_i;
 
-            self.chr_offset[4] = self.bank_register[0] * 0x400;
-            self.chr_offset[5] = (self.bank_register[0] + 1) * 0x400;
-            self.chr_offset[6] = self.bank_register[1] * 0x400;
-            self.chr_offset[7] = (self.bank_register[1] + 1) * 0x400;
+            self.chr_offset[4] = r0_li;
+            self.chr_offset[5] = r0_hi;
+            self.chr_offset[6] = r1_li;
+            self.chr_offset[7] = r1_hi;
         } else {
-            self.chr_offset[0] = self.bank_register[0] * 0x400;
-            self.chr_offset[1] = (self.bank_register[0] + 1) * 0x400;
-            self.chr_offset[2] = self.bank_register[1] * 0x400;
-            self.chr_offset[3] = (self.bank_register[1] + 1) * 0x400;
+            self.chr_offset[0] = r0_li;
+            self.chr_offset[1] = r0_hi;
+            self.chr_offset[2] = r1_li;
+            self.chr_offset[3] = r1_hi;
 
-            self.chr_offset[4] = self.bank_register[2] * 0x400;
-            self.chr_offset[5] = self.bank_register[3] * 0x400;
-            self.chr_offset[6] = self.bank_register[4] * 0x400;
-            self.chr_offset[7] = self.bank_register[5] * 0x400;
+            self.chr_offset[4] = r2_i;
+            self.chr_offset[5] = r3_i;
+            self.chr_offset[6] = r4_i;
+            self.chr_offset[7] = r5_i;
         }
     }
 }
