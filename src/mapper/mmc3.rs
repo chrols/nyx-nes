@@ -21,6 +21,7 @@ pub struct MMC3 {
     irq_counter: u8,
     irq_counter_reload: u8,
     irq_enabled: bool,
+    irq_triggered: bool,
 }
 
 impl MMC3 {
@@ -33,13 +34,14 @@ impl MMC3 {
             chr_inversion: false,
             prg_ram: vec![0; 0x2000],
             prg_bank_mode: false,
-            prg_offset: [0, 0, prg_next_to_last, prg_last_block],
-            chr_offset: [0, 1, 2, 3, 4, 5, 6, 7],
+            prg_offset: [0, 1, prg_next_to_last, prg_last_block],
+            chr_offset: [0, 0, 0, 0, 0, 0, 0, 0],
             bank_register: [0; 8],
             bank_select: 0,
             irq_counter: 0,
             irq_counter_reload: 0,
             irq_enabled: false,
+            irq_triggered: false,
         };
         mmc3.update_offsets();
         mmc3
@@ -111,13 +113,12 @@ impl MMC3 {
     }
 
     fn irq_enable(&mut self) {
-        println!("IRQ ENable");
         self.irq_enabled = true;
     }
 
     fn irq_disable(&mut self) {
-        println!("IRQ Disable");
         self.irq_enabled = false;
+        self.irq_triggered = false;
     }
 
     fn update_offsets(&mut self) {
@@ -206,7 +207,6 @@ impl Cartridge for MMC3 {
         };
 
         let offset = (address % 0x2000) as usize;
-        //println!("{:X}, {:X}", prg_addr, self.prg_offset[0]);
         self.file.prg_rom[prg_addr + offset]
     }
 
@@ -251,6 +251,27 @@ impl Cartridge for MMC3 {
         self.mirroring
     }
 
+    fn irq(&mut self) -> bool {
+        if self.irq_enabled && self.irq_triggered {
+            self.irq_triggered = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn on_scanline(&mut self) {
+        if self.irq_counter == 0 {
+            self.irq_counter = self.irq_counter_reload;
+        } else {
+            self.irq_counter -= 1;
+
+            if self.irq_counter == 0 && self.irq_enabled {
+                self.irq_triggered = true;
+            }
+        }
+    }
+
     fn to_json(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
@@ -268,6 +289,7 @@ impl Cartridge for MMC3 {
         mem::swap(&mut self.irq_counter, &mut rom.irq_counter);
         mem::swap(&mut self.irq_counter_reload, &mut rom.irq_counter_reload);
         mem::swap(&mut self.irq_enabled, &mut rom.irq_enabled);
+        mem::swap(&mut self.irq_triggered, &mut rom.irq_triggered);
     }
 }
 

@@ -15,6 +15,11 @@ pub trait Cartridge {
     fn ppu_write(&mut self, address: u16, byte: u8);
     fn mirroring(&self) -> Mirroring;
 
+    fn irq(&mut self) -> bool {
+        false
+    }
+    fn on_scanline(&mut self) {}
+
     fn from_json(&mut self, json: &str) {
         unimplemented!("from_json not implemented for mapper");
     }

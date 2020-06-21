@@ -759,10 +759,9 @@ impl Cpu {
         self.cyc += 7;
     }
 
-    // TODO: Needed by MMC4
-    #[allow(dead_code)]
     fn irq(&mut self) {
-        self.push_word(self.pc - 1); // FIXME: Why -1?
+        self.push_word(self.pc);
+        self.php(&Step::new());
         self.pc = self.read_word(0xFFFE);
         self.i = true;
         self.cyc += 7;
@@ -930,6 +929,10 @@ impl Cpu {
             self.cyc += 7;
         }
 
+        if !self.i {
+            self.check_for_cart_irq();
+        }
+
         let total_cycles = self.cyc - old_cycles;
 
         for _ in 0..total_cycles * 3 {
@@ -954,6 +957,17 @@ impl Cpu {
     fn set_zn(&mut self, value: u8) {
         self.z = value == 0;
         self.n = (value as i8) < 0;
+    }
+
+    fn check_for_cart_irq(&mut self) {
+        let irq_occurred = match &mut self.ppu.rom {
+            Some(game) => game.irq(),
+            None => false,
+        };
+
+        if irq_occurred {
+            self.irq();
+        }
     }
 
     fn decode_address(&mut self, mode: &AddressingMode) -> (u16, bool) {

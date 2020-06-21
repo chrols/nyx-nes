@@ -365,7 +365,15 @@ impl Ppu {
             }
             256 => self.y_increment(),
             257 => self.horizontal_t2v(),
-            258...279 => (),
+            258 | 259 => (),
+            260 => {
+                if self.rendering_enabled() {
+                    if let Some(game) = &mut self.rom {
+                        game.on_scanline();
+                    }
+                }
+            }
+            261...279 => (),
             280...304 => self.vertical_t2v(),
             305...320 => (),
             321...336 => self.prefetch(),
@@ -393,7 +401,15 @@ impl Ppu {
                 self.clear_secondary_oam();
                 self.sprite_evaluation();
             }
-            258...320 => (),
+            258 | 259 => (),
+            260 => {
+                if self.rendering_enabled() {
+                    if let Some(game) = &mut self.rom {
+                        game.on_scanline();
+                    }
+                }
+            }
+            261...320 => (),
             321...336 => self.prefetch(),
             337...339 => (),
             _ => (),
