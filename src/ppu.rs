@@ -15,6 +15,8 @@ const SCANLINES_PER_FRAME: usize = 262;
 /// Each scanline lasts for 341 PPU clock cycles
 const CYCLES_PER_SCANLINE: usize = 341;
 
+type ColorIndex = u8;
+
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Color {
     pub r: u8,
@@ -183,6 +185,11 @@ pub struct Ppu {
     pub cpu_nmi: bool,
     #[serde(skip)]
     pub rom: Option<Box<Cartridge>>,
+
+    pub use_ntsc: bool,
+    prev_pixel: u8,
+    cycle_counter: u8,
+    ntsc_palette: Vec<u32>,
 }
 
 impl Ppu {
@@ -222,6 +229,10 @@ impl Ppu {
             sprite_offset: false,
             cpu_nmi: false,
             rom: None,
+            use_ntsc: false,
+            prev_pixel: 0,
+            cycle_counter: 0,
+            ntsc_palette: vec![0; 3 * 64 * 512],
         }
     }
 
@@ -325,6 +336,11 @@ impl Ppu {
         if self.odd_frame_cycle_skip() {
             self.current_cycle = 0;
             self.scanline = 0;
+        }
+
+        self.cycle_counter += 1;
+        if self.cycle_counter == 3 {
+            self.cycle_counter = 0;
         }
     }
 
@@ -431,7 +447,7 @@ impl Ppu {
 
     // Return the color for the sprite described by oam at the current
     // beam position (if applicable).
-    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<Color> {
+    fn sprite_color(&mut self, x: u8, y: u8, oam: OamData) -> Option<ColorIndex> {
         let tile_addr = self.tile_address_for_index(oam.index);
         let horizontal_mirror = oam.attr & 0x80 != 0;
 
@@ -472,7 +488,7 @@ impl Ppu {
         assert!(pixel < 4);
 
         let palette_addr = (oam.attr as u16 & 0x3) * 4 + 0x3F10;
-        let color = palette(self.read_memory(palette_addr + pixel as u16));
+        let color = self.read_memory(palette_addr + pixel as u16);
         Some(color)
     }
 
@@ -513,7 +529,7 @@ impl Ppu {
 
     // Return the color for the sprite at the current beam position
     // (if any).
-    fn sprite_pixel(&mut self) -> Option<Color> {
+    fn sprite_pixel(&mut self) -> Option<ColorIndex> {
         let x = (self.current_cycle) as u8;
         let y = (self.scanline) as u8;
 
@@ -572,7 +588,7 @@ impl Ppu {
     }
 
     // FIXME Mutates state. Make explicit?
-    fn bg_pixel(&mut self) -> Option<Color> {
+    fn bg_pixel(&mut self) -> Option<ColorIndex> {
         let color = if (self.bg_tile_low << self.fine_x & 0x8000) != 0 {
             1
         } else {
@@ -609,11 +625,11 @@ impl Ppu {
 
         assert!(color < 4);
         let palette_addr = (attribute as u16 * 4) + 0x3F00 + color as u16;
-        Some(palette(self.read_memory(palette_addr)))
+        Some(self.read_memory(palette_addr))
     }
 
-    fn universal_bg(&mut self) -> Color {
-        palette(self.read_memory(0x3F00))
+    fn universal_bg(&mut self) -> ColorIndex {
+        self.read_memory(0x3F00)
     }
 
     // Render pixel for the current "beam" position
@@ -623,13 +639,19 @@ impl Ppu {
         let x = self.current_cycle - 1;
         let y = self.scanline;
 
-        self.canvas[(y * 256 + x) as usize] = if let Some(sprite_pixel) = self.sprite_pixel() {
+        let ci = if let Some(sprite_pixel) = self.sprite_pixel() {
             sprite_pixel
         } else if let Some(bg_pixel) = self.bg_pixel() {
             bg_pixel
         } else {
             self.universal_bg()
         };
+
+        if self.use_ntsc {
+            self.canvas[(y * 256 + x) as usize] = self.ntsc_color(ci);
+        } else {
+            self.canvas[(y * 256 + x) as usize] = palette(ci);
+        }
 
         if self.grayscale {
             let p = self.canvas[(y * 256 + x) as usize];
@@ -1006,6 +1028,116 @@ impl Ppu {
     pub fn dump(&self) {
         println!("Cycle: {}, Scanline: {}", self.current_cycle, self.scanline);
     }
+
+    fn ntsc_color(&mut self, color_index: u8) -> Color {
+        let pi = self.cycle_counter as usize * 64 * 512
+            + (self.prev_pixel % 64) as usize * 512
+            + color_index as usize;
+        let ntsc_color = self.ntsc_palette[pi];
+        let r = ((ntsc_color >> 16) & 0xff) as u8;
+        let g = ((ntsc_color >> 8) & 0xff) as u8;
+        let b = ((ntsc_color >> 0) & 0xff) as u8;
+
+        self.prev_pixel = color_index;
+        Color::rgb(r, g, b)
+    }
+
+    // Adapted from bisqwit NTSC filter here:
+    // https://bisqwit.iki.fi/jutut/kuvat/programming_examples/nesemu1/nesemu1.cc
+    pub fn build_ntsc_palette(&mut self) {
+        // The input value is a NES color index (with de-emphasis bits).
+        // We need RGB values. To produce a RGB value, we emulate the NTSC circuitry.
+        // For most part, this process is described at:
+        //    http://wiki.nesdev.com/w/index.php/NTSC_video
+
+        let s = [
+            -6, -69, 26, -59, 29, -55, 73, -40, 68, -17, 125, 11, 68, 33, 125, 78,
+        ];
+
+        for o in 0..3 {
+            for u in 0..3 {
+                for p0 in 0..512 {
+                    for p1 in 0..64 {
+                        let mut y = 0;
+                        let mut i = 0;
+                        let mut q = 0;
+                        for p in 0..12 {
+                            // 12 samples of NTSC signal constitute a color.
+                            // Sample either the previous or the current pixel.
+                            let r = (p + o * 4) % 12;
+                            // let pixel = p0;
+                            let pixel = if r < 8 - u * 2 { p0 } else { p1 }; // Use pixel=p0 to disable artifacts.
+
+                            // Decode the color index.
+                            let c = pixel % 16;
+                            let l = if c < 0xE { pixel / 4 & 12 } else { 4 };
+                            let e = p0 / 64;
+
+                            let cond1 = (c + 8 + p) % 12 < 6;
+                            let cond2 = 152278 >> p / 2 * 3 & e == 0;
+                            let cond3 = c > if cond1 { 12 } else { 0 };
+
+                            let index = if cond3 { 1 } else { 0 } + if cond2 { 2 } else { 0 } + l;
+
+                            // NES NTSC modulator (square wave between up to four voltage levels):
+                            let b = 40 + s[index];
+
+                            // Ideal TV NTSC demodulator:
+                            let (sin, cos) = (std::f32::consts::PI * p as f32 / 6.0).sin_cos();
+
+                            y += b;
+                            i += b * (cos * 5909.0) as i32;
+                            q += b * (sin * 5909.0) as i32;
+                        }
+
+                        // Convert the YIQ color into RGB
+                        let gammafix = |f: f32| {
+                            if f <= 0.0 {
+                                0.0
+                            } else {
+                                f.powf(2.2 / 1.8)
+                            }
+                        };
+
+                        let clamp = |v| {
+                            if v > 255.0 {
+                                255
+                            } else {
+                                v as u32
+                            }
+                        };
+
+                        let pi = o * 64 * 512 + p1 * 512 + p0;
+
+                        // Store color at subpixel precision
+                        self.ntsc_palette[pi] += match u {
+                            2 => {
+                                let v = y as f32 / 1980.0
+                                    + i as f32 * 0.947 / 9e6
+                                    + q as f32 * 0.624 / 9e6;
+                                0x10000 * clamp(255.0 * gammafix(v))
+                            }
+
+                            1 => {
+                                let v = y as f32 / 1980.0
+                                    + i as f32 * -0.275 / 9e6
+                                    + q as f32 * -0.636 / 9e6;
+                                0x00100 * clamp(255.0 * gammafix(v))
+                            }
+
+                            0 => {
+                                let v = y as f32 / 1980.0
+                                    + i as f32 * -1.109 / 9e6
+                                    + q as f32 * 1.709 / 9e6;
+                                0x00001 * clamp(255.0 * gammafix(v))
+                            }
+                            _ => panic!("NTSC Invalid value"),
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1210,5 +1342,21 @@ mod tests {
             count += 1;
         }
         assert_eq!(EVEN_FRAME_TIME, count);
+    }
+
+    #[test]
+    fn ntsc_palette() {
+        let mut ppu = Ppu::new();
+        ppu.build_ntsc_palette();
+        assert_eq!(ppu.ntsc_palette[0], 0x5460819);
+        assert_eq!(ppu.ntsc_palette[1], 0x1001527);
+        assert_eq!(ppu.ntsc_palette[2], 0x2312526);
+        assert_eq!(ppu.ntsc_palette[3], 0x3886155);
+        assert_eq!(ppu.ntsc_palette[4], 0x5460782);
+        assert_eq!(ppu.ntsc_palette[5], 0x5458191);
+        assert_eq!(ppu.ntsc_palette[6], 0x5456896);
+        assert_eq!(ppu.ntsc_palette[7], 0x4145664);
+        assert_eq!(ppu.ntsc_palette[8], 0x2638080);
+        assert_eq!(ppu.ntsc_palette[9], 0x1195520);
     }
 }

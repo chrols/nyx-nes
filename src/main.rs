@@ -18,6 +18,7 @@ fn main() {
         let file = ines::File::read(filename);
         cpu.load_game(file);
         cpu.reset();
+        cpu.ppu.build_ntsc_palette();
         gui::execute(&mut cpu);
     } else {
         cpu::Cpu::kevtris_nestest();

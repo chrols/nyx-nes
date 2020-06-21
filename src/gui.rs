@@ -161,6 +161,7 @@ pub fn execute(cpu: &mut Cpu) {
                     } => match kc {
                         Keycode::Num1 => cpu.tracing = !cpu.tracing,
                         Keycode::Num2 => png::write_png_frame(&cpu.ppu),
+                        Keycode::Num5 => cpu.ppu.use_ntsc = !cpu.ppu.use_ntsc,
                         Keycode::A => cpu.ppu.dump_pattern_tables(),
                         Keycode::O => cpu.ppu.dump_oam(),
                         Keycode::E => cpu.ppu.dump_nametables(),
